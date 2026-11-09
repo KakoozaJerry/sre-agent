@@ -77,7 +77,7 @@ An agent is well suited to the diagnosis half and to executing bounded, pre-appr
 Components:
 
 - **Ingestion.** FastAPI service receiving Alertmanager webhook payloads and generic alerts; normalises them into incidents; deduplicates and groups repeat firings.
-- **Incident store.** SQLite first (single file, zero ops), Postgres later. The incident record is the spine: timeline, evidence, hypotheses, actions, approvals.
+- **Incident store.** An in-memory store behind a small interface first — Phase 1 taught that webhooks can be built and tested honestly without a database, and the webhook shapes must not change when the storage does. SQLite next (single file, zero ops), Postgres later. The incident record is the spine: timeline, evidence, hypotheses, actions, approvals.
 - **Reasoning core.** A bounded loop with explicit state: gather context → rank hypotheses with supporting evidence → decide next query or propose action → verify outcome. Hard step and token budgets per incident; the loop must be able to say "I don't know" and escalate.
 - **Tool layer.** Typed, schema-validated tools: `query_metrics` (PromQL), `search_logs`, `get_pod_status`, `get_recent_deploys`, `describe_service`. Each tool is read-only in v1 and returns bounded, redacted output.
 - **Policy & guardrail engine.** Classifies every proposed action by tier (Section 6), checks blast radius (namespace, replica count, environment), enforces rate limits and maintenance windows, routes approvals, and writes the audit record *before* execution.
@@ -123,7 +123,7 @@ Defaults: new environments start at Tier 1. Tier 3 is per-runbook-class, per-env
 - [x] Incident data model + state machine with tests
 
 **Phase 1 — Read-only diagnosis (weeks 2–3)**
-- [ ] Alertmanager webhook ingestion + generic webhook; dedupe/grouping
+- [x] Alertmanager webhook ingestion + generic webhook; dedupe/grouping
 - [ ] Tool layer v1: PromQL query, log search (Loki or file-based in demo), service status
 - [ ] Reasoning loop v1 producing an evidence-cited diagnosis report
 - [ ] Demo environment v1: sample service + Prometheus + Alertmanager in Compose
@@ -207,6 +207,7 @@ Every hour, a refinement pass: (1) compare repo state against this plan, (2) ref
 
 ## 16. Progress log
 
+- **2026-11-08 21:11 ET** — Hourly pass: Phase 1 started; first roadmap item checked off. Alert ingestion is in (`ingestion.py` + `server.py`): an Alertmanager webhook and a simple generic webhook, both turning alerts into incidents in an in-memory store. The same alert firing again is counted as a duplicate, not a new incident; a different alert for the same target and alert name joins the open incident as evidence; a resolved alert closes the incident so the next firing starts fresh. FastAPI moved into the main dependencies, since the server is now real code, and httpx into the dev tools for endpoint tests. 14 new tests — 33 pass locally, ruff and mypy clean, safety suite included. Plan refined in one place (Section 5): the incident store is memory-first behind a small interface, SQLite next; the webhook shapes will not change when the storage does.
 - **2026-11-08 20:04 ET** — Hourly pass: Phase 0 completed and checked off. Added the one missing skeleton piece, structured logging (`logging_config.py`: one setup, JSON lines, unknown levels rejected, safe to call twice), plus a `log_level` setting and 5 new tests — 19 tests pass locally, ruff clean, safety suite included. Plan refined in one place (Section 7): it claimed CI runs mypy type checking; it does not — CI runs ruff + tests, mypy is local-only until the workflow file is next edited on the website. That correction is now written into the plan.
 - **2026-11-08 19:20 ET** — Repo fully populated (17 files) and CI green on run #4 (lint + 14 tests, incl. the safety suite) after fixing the 3 ruff errors CI caught. push_files (git trees API) is refused by the app; per-file Contents API works; the workflow file went in via the web UI.
 - **2026-11-08 19:07 ET** — Public repo created at github.com/KakoozaJerry/sre-agent (via browser). First file set built and verified locally (14 tests pass) but the GitHub connector cannot write to the new repo until Abraham adds it to the Muse GitHub App's repository access — flagged to him as a one-time settings tap.
