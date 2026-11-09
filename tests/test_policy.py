@@ -13,13 +13,13 @@ TARGET = Target(environment="demo", namespace="shop", service="checkout")
 
 
 def _action(**overrides) -> ProposedAction:
-    base = dict(
-        runbook_id="restart-workload",
-        target=TARGET,
-        parameters={"deployment": "checkout"},
-        replicas_affected=1,
-        rationale="pods are crash-looping after the last deploy",
-    )
+    base: dict = {
+        "runbook_id": "restart-workload",
+        "target": TARGET,
+        "parameters": {"deployment": "checkout"},
+        "replicas_affected": 1,
+        "rationale": "pods are crash-looping after the last deploy",
+    }
     base.update(overrides)
     return ProposedAction(**base)
 
