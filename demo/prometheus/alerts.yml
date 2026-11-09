@@ -1,0 +1,20 @@
+# Alert rules for the demo.
+#
+# HighErrorRate fires when the sample service's error counter is
+# above zero. The metric name is the same one the agent's
+# reasoning loop asks about, and the labels name the same target
+# the sample service publishes, so the alert, the incident, and
+# the diagnosis all line up.
+groups:
+  - name: demo
+    rules:
+      - alert: HighErrorRate
+        expr: http_request_errors_total > 0
+        for: 10s
+        labels:
+          severity: critical
+          service: checkout
+          namespace: shop
+          environment: demo
+        annotations:
+          summary: "Checkout is returning errors in the demo environment"
