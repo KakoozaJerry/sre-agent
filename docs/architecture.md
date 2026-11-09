@@ -52,8 +52,9 @@ src/sre_agent/
     config.py     settings (environment-pinned targets, budgets, tier grants)
     logging_config.py  one setup for all logs; each line is one JSON object
     agent.py      reasoning loop (lands in Phase 1)
-    tools/        read-only tool implementations (Phase 1)
+    tools.py      read-only tools: metrics, logs, service status (Phase 1)
     server.py     webhook ingestion service (Phase 1)
+    ingestion.py  alert normalising, dedupe/grouping, incident store
 tests/            unit tests; the policy suite is a required CI gate
 docs/             this documentation set
 PLAN.md           the living plan, refined as the build proceeds
