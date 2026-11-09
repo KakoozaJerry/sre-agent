@@ -110,17 +110,17 @@ Defaults: new environments start at Tier 1. Tier 3 is per-runbook-class, per-env
 - **Storage:** SQLite via SQLModel for v1; interface kept swappable.
 - **Demo environment:** Docker Compose — a small sample service, Prometheus, Alertmanager, and a chaos script set. Kubernetes (kind) arrives with the first k8s tools.
 - **Testing:** pytest; scenario tests run the agent against recorded/synthetic telemetry before live chaos.
-- **CI:** GitHub Actions — lint (ruff), type check (mypy), unit tests, and the safety test suite (policy engine tests) as a required gate.
+- **CI:** GitHub Actions — lint (ruff), unit tests, and the safety test suite (policy engine tests) as a required gate. Type checking (mypy) is in the dev tools and runs locally for now; it is not in CI yet, because the workflow file can only be changed through the GitHub website (the app connector cannot write workflow files — learned 2026-11-08). It joins CI the next time that file is edited there.
 - **Packaging:** pyproject.toml, console entry point `sre-agent`; MIT licence.
 
 ## 8. Roadmap
 
 **Phase 0 — Foundation (week 1)**
-- [ ] Repository, licence, README with vision and safety stance
-- [ ] This plan committed to the repo (`PLAN.md`)
-- [ ] Architecture and safety-model docs
-- [ ] Project skeleton: package layout, config, logging, CI green on empty tests
-- [ ] Incident data model + state machine with tests
+- [x] Repository, licence, README with vision and safety stance
+- [x] This plan committed to the repo (`PLAN.md`)
+- [x] Architecture and safety-model docs
+- [x] Project skeleton: package layout, config, logging, CI green on empty tests
+- [x] Incident data model + state machine with tests
 
 **Phase 1 — Read-only diagnosis (weeks 2–3)**
 - [ ] Alertmanager webhook ingestion + generic webhook; dedupe/grouping
@@ -207,6 +207,7 @@ Every hour, a refinement pass: (1) compare repo state against this plan, (2) ref
 
 ## 16. Progress log
 
+- **2026-11-08 20:04 ET** — Hourly pass: Phase 0 completed and checked off. Added the one missing skeleton piece, structured logging (`logging_config.py`: one setup, JSON lines, unknown levels rejected, safe to call twice), plus a `log_level` setting and 5 new tests — 19 tests pass locally, ruff clean, safety suite included. Plan refined in one place (Section 7): it claimed CI runs mypy type checking; it does not — CI runs ruff + tests, mypy is local-only until the workflow file is next edited on the website. That correction is now written into the plan.
 - **2026-11-08 19:20 ET** — Repo fully populated (17 files) and CI green on run #4 (lint + 14 tests, incl. the safety suite) after fixing the 3 ruff errors CI caught. push_files (git trees API) is refused by the app; per-file Contents API works; the workflow file went in via the web UI.
 - **2026-11-08 19:07 ET** — Public repo created at github.com/KakoozaJerry/sre-agent (via browser). First file set built and verified locally (14 tests pass) but the GitHub connector cannot write to the new repo until Abraham adds it to the Muse GitHub App's repository access — flagged to him as a one-time settings tap.
 - **2026-11-08 19:02 ET** — Abraham's direction added: documentation plain and simple, income as a long-term goal via an open-core path, and an open-source strategy that proves reliability in public. Plan updated (Sections 10–13).
