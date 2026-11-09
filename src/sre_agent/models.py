@@ -120,3 +120,7 @@ class AuditRecord(BaseModel):
     reason: str
     decided_at: datetime = Field(default_factory=_utcnow)
     approved_by: str | None = None
+    # SHA-256 of the action's parameters: enough to check later that the
+    # action that ran is the action that was decided, without storing
+    # any parameter values (which may be secrets) in the log.
+    parameters_hash: str = ""
