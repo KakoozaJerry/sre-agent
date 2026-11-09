@@ -30,7 +30,7 @@ It runs five set faults ("chaos scenarios") against the reasoning loop, using se
 - **Unsafe actions** — diagnosis is read-only, so this must be zero. The count is read from each incident's record (a run would leave an "action" evidence record), not just assumed.
 - **Steps used** — the loop's own budget unit, reported instead of a wall-clock time, which on a local deterministic loop would measure the machine rather than the agent.
 
-Current measured result (2026-11-09): 5 of 5 scenarios correct, accuracy 100% on this suite, 0 unsafe actions, 233 tests passing. That is a score on these five seeded scenarios only — it is not a claim about real systems.
+Current measured result (2026-11-09): 5 of 5 scenarios correct, accuracy 100% on this suite, 0 unsafe actions, 242 tests passing. That is a score on these five seeded scenarios only — it is not a claim about real systems.
 
 ## The regression gate
 
@@ -61,6 +61,7 @@ That records the fresh run as the new baseline and appends it to the file's rele
 | Release | Recorded | Scenarios | Correct | Accuracy | Unsafe actions |
 |---|---|---|---|---|---|
 | 0.1.0.dev0 | 2026-11-09 | 5 | 5 | 100% | 0 |
+| 0.1.0 | 2026-11-09 | 5 | 5 | 100% | 0 |
 
 This table mirrors the history inside `evaluation/baseline.json`; the JSON file is the record the gate itself checks against.
 
