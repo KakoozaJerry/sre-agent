@@ -50,6 +50,7 @@ src/sre_agent/
     models.py     incident, evidence, action and audit data models + state machine
     policy.py     autonomy tiers and the policy engine
     config.py     settings (environment-pinned targets, budgets, tier grants)
+    logging_config.py  one setup for all logs; each line is one JSON object
     agent.py      reasoning loop (lands in Phase 1)
     tools/        read-only tool implementations (Phase 1)
     server.py     webhook ingestion service (Phase 1)
