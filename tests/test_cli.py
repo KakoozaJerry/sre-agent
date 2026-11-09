@@ -68,7 +68,7 @@ def _fetch_raising(error):
 
 def test_version(capsys):
     assert main(["--version"]) == 0
-    assert "sre-agent 0.1.0.dev0" in capsys.readouterr().out
+    assert "sre-agent 0.1.0" in capsys.readouterr().out
 
 
 def test_no_args_prints_usage(capsys):
