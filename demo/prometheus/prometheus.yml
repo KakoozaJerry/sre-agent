@@ -1,0 +1,22 @@
+# Prometheus in the demo: watch the sample service, judge the
+# alert rules, and hand firing alerts to Alertmanager.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files:
+  - alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: sample-service
+    static_configs:
+      - targets: ["sample-service:8000"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
