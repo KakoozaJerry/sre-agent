@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from sre_agent.models import Evidence, Incident, IncidentStatus, Target
 
@@ -40,7 +41,7 @@ def test_failed_fix_returns_to_triaging():
 
 def test_target_is_immutable():
     target = Target(environment="demo", namespace="shop", service="checkout")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         target.service = "payments"  # type: ignore[misc]
 
 
