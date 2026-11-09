@@ -1,0 +1,15 @@
+# Alertmanager in the demo: send every alert to the agent's
+# Alertmanager webhook. send_resolved is on, so the agent also
+# hears when the failure stops and can close the incident.
+route:
+  receiver: sre-agent
+  group_by: ["alertname", "service"]
+  group_wait: 5s
+  group_interval: 5s
+  repeat_interval: 1h
+
+receivers:
+  - name: sre-agent
+    webhook_configs:
+      - url: http://sre-agent:8080/webhooks/alertmanager
+        send_resolved: true
