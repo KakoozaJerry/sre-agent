@@ -11,6 +11,7 @@ terminal:
     sre-agent evaluate
     sre-agent regression-check [--baseline PATH] [--update-baseline]
     sre-agent injection-check
+    sre-agent tier3-check
     sre-agent --version
 
 How it works, honestly:
@@ -76,6 +77,17 @@ stays in the evidence record as data, no claim, hypothesis, or
 diagnosis repeats its orders, no action runs, and the answer is
 the one the honest numbers give. It exits 1 when any case fails
 or any unsafe action is counted.
+
+``tier3-check`` runs the Tier 3 drill set locally (see
+tier3.py): seven rehearsed checks on the demo environment's
+bounded-autonomy grant. The pre-approved fixes (restart and
+scale, shop namespace only, at most three replicas touched)
+must run on their own and be audited; rollback, which is not
+pre-approved, must not run on its own; a fix that is too big
+or aimed outside the granted namespace must be refused; and
+the kill switch drills must show a halt pressed between two
+runs stopping the second one, while read-only checks continue.
+It exits 1 when any drill fails.
 """
 
 from __future__ import annotations
@@ -106,6 +118,7 @@ from .regression import (
     record_new_baseline,
 )
 from .runbooks import RunbookError, build_action, demo_runbooks
+from .tier3 import Tier3Report, run_tier3_drills
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8080"
 ENV_BASE_URL = "SRE_AGENT_BASE_URL"
@@ -145,6 +158,13 @@ USAGE = """Usage:
                                          must change nothing (exit 1 if any
                                          case fails or any unsafe action
                                          is counted)
+  sre-agent tier3-check                  Run the Tier 3 drill set on the
+                                         demo grant: pre-approved fixes
+                                         run, everything outside the grant
+                                         does not, and the kill switch
+                                         stops mutations while reads
+                                         continue (exit 1 if any drill
+                                         fails)
   sre-agent --version                    Print the version
 
 The server address defaults to http://127.0.0.1:8080 and can also be
@@ -470,6 +490,7 @@ def main(
     run_demo_postmortem: Callable[[], PostmortemDraft] | None = None,
     run_suite: Callable[[], EvaluationReport] | None = None,
     run_injection: Callable[[], InjectionReport] | None = None,
+    run_drills: Callable[[], Tier3Report] | None = None,
 ) -> int:
     """Run one CLI command. Returns the process exit code."""
     args = list(sys.argv[1:] if argv is None else argv)
@@ -517,6 +538,15 @@ def main(
                 injection_report.passed_count != injection_report.total
                 or injection_report.unsafe_actions
             ):
+                return 1
+            return 0
+        if command == "tier3-check":
+            if rest:
+                raise CliError("tier3-check takes no extra arguments")
+            drills = run_drills or run_tier3_drills
+            tier3_report = drills()
+            print(tier3_report.render_text())
+            if tier3_report.passed_count != tier3_report.total:
                 return 1
             return 0
         if command == "regression-check":
