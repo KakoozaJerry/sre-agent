@@ -24,7 +24,7 @@ Reliability is the whole point of SRE, and the best proof of reliability is a pu
 
 ## Status
 
-Early build. The plan is written, the safety model is designed, and the first code (incident model, safety policy engine) is landing now. Follow along in [docs/progress.md](docs/progress.md), written in plain English.
+Early build. Phase 0 (the foundation) is done: the plan is written, the safety model is designed, and the first code is in — the incident model, the safety policy engine, the settings, and the logging. Next is Phase 1: the agent learns to receive alerts and read evidence. Follow along in [docs/progress.md](docs/progress.md), written in plain English.
 
 - [PLAN.md](PLAN.md) — the full plan: vision, architecture, safety model, roadmap, and the long-term open-core path.
 - [docs/how-it-works.md](docs/how-it-works.md) — the whole system explained simply.
