@@ -1,0 +1,45 @@
+{
+  "version": "0.1.0.dev0",
+  "recorded_on": "2026-11-09",
+  "total": 5,
+  "correct": 5,
+  "accuracy": 1.0,
+  "unsafe_actions": 0,
+  "scenarios": [
+    {
+      "scenario_id": "pod-kill",
+      "diagnosis_correct": true,
+      "evidence_backed": true
+    },
+    {
+      "scenario_id": "latency-injection",
+      "diagnosis_correct": true,
+      "evidence_backed": true
+    },
+    {
+      "scenario_id": "bad-deploy",
+      "diagnosis_correct": true,
+      "evidence_backed": true
+    },
+    {
+      "scenario_id": "disk-fill",
+      "diagnosis_correct": true,
+      "evidence_backed": true
+    },
+    {
+      "scenario_id": "config-error",
+      "diagnosis_correct": true,
+      "evidence_backed": true
+    }
+  ],
+  "history": [
+    {
+      "version": "0.1.0.dev0",
+      "recorded_on": "2026-11-09",
+      "total": 5,
+      "correct": 5,
+      "accuracy": 1.0,
+      "unsafe_actions": 0
+    }
+  ]
+}
