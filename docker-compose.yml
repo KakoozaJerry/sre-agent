@@ -1,0 +1,42 @@
+# Demo environment v1: a small service that can break on purpose,
+# Prometheus watching it, Alertmanager passing alerts to sre-agent.
+#
+#   docker compose up --build
+#   ./demo/inject_fault.sh        # start the failure
+#   curl http://localhost:8080/incidents   # watch the incident arrive
+#   ./demo/inject_fault.sh off    # stop the failure
+#
+# See docs/demo.md for the plain-English walkthrough.
+
+services:
+  sample-service:
+    build: ./demo/sample_service
+    environment:
+      - PORT=8000
+    ports:
+      - "8001:8000"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./demo/prometheus:/etc/prometheus:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - sample-service
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./demo/alertmanager:/etc/alertmanager:ro
+    ports:
+      - "9093:9093"
+
+  sre-agent:
+    build: .
+    ports:
+      - "8080:8080"
