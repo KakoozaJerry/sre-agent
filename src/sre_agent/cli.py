@@ -12,6 +12,9 @@ terminal:
     sre-agent regression-check [--baseline PATH] [--update-baseline]
     sre-agent injection-check
     sre-agent tier3-check
+    sre-agent memory-demo
+    sre-agent adapters-demo
+    sre-agent security-check
     sre-agent --version
 
 How it works, honestly:
@@ -88,6 +91,35 @@ or aimed outside the granted namespace must be refused; and
 the kill switch drills must show a halt pressed between two
 runs stopping the second one, while read-only checks continue.
 It exits 1 when any drill fails.
+
+``memory-demo`` runs the memory report locally on seeded past
+incidents (see memory.py): for a fresh demo checkout incident
+it finds the similar past incidents, counts each runbook's
+record from the action records on those incidents, and ranks
+suggested runbooks by their record on same-service past
+incidents only.
+It is advice only — it runs nothing, proposes nothing through
+the policy engine, and approves nothing. Memory is not wired
+into the live server or the reasoning loop yet.
+
+``adapters-demo`` runs the three read adapters locally on
+seeded demo data (see adapters.py): the Kubernetes pod listing
+for the demo checkout workload, a Datadog metrics query, and an
+Azure Monitor KQL query. Every adapter only looks — nothing is
+changed in any system — and no live cluster, Datadog account or
+Azure workspace is called; the live backends behind the same
+shapes are not claimed as tested.
+
+``security-check`` runs the security review probes locally (see
+security_review.py): ten probes that attack the agent's own
+surface — a made-up runbook, a free-form command as a parameter,
+a retargeted fix, secrets planted where the audit log and the
+evidence could leak them, a replayed approval, an approval into
+a halt, the Tier 3 limits, refused management and broken
+queries, a scan for any shell surface, and alert text claiming
+an incident is over. It prints the findings the probes cannot
+prove away as well (the largest: the webhook server has no
+authentication). It exits 1 when any probe fails.
 """
 
 from __future__ import annotations
@@ -102,10 +134,12 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .adapters import AdaptersDemoReport, demo_adapters
 from .approvals import ApprovalError, approve_pending, create_pending, execute_approved
 from .audit import AuditLog, evaluate_and_audit
 from .evaluation import EvaluationReport, run_evaluation
 from .injection import InjectionReport, run_injection_suite
+from .memory import MemoryReport, demo_memory
 from .models import Incident, IncidentStatus, Target
 from .policy import EnvironmentPolicy, Tier
 from .postmortems import PostmortemDraft, demo_postmortem
@@ -118,6 +152,7 @@ from .regression import (
     record_new_baseline,
 )
 from .runbooks import RunbookError, build_action, demo_runbooks
+from .security_review import SecurityReport, run_security_review
 from .tier3 import Tier3Report, run_tier3_drills
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8080"
@@ -164,6 +199,25 @@ USAGE = """Usage:
                                          does not, and the kill switch
                                          stops mutations while reads
                                          continue (exit 1 if any drill
+                                         fails)
+  sre-agent memory-demo                  Show what memory says about a
+                                         fresh demo checkout incident:
+                                         similar past incidents, each
+                                         runbook's record, and suggested
+                                         runbooks ranked by their record
+                                         on same-service past incidents
+                                         only (advice only; nothing runs)
+  sre-agent adapters-demo                Show the three read adapters on
+                                         seeded demo data: Kubernetes pods,
+                                         a Datadog metrics query, and an
+                                         Azure Monitor KQL query (all
+                                         read-only; no live system called)
+  sre-agent security-check               Run the security review probes:
+                                         ten attacks on the agent's own
+                                         surface must all be refused or
+                                         contained, and the findings the
+                                         probes cannot prove away are
+                                         printed (exit 1 if any probe
                                          fails)
   sre-agent --version                    Print the version
 
@@ -491,6 +545,9 @@ def main(
     run_suite: Callable[[], EvaluationReport] | None = None,
     run_injection: Callable[[], InjectionReport] | None = None,
     run_drills: Callable[[], Tier3Report] | None = None,
+    run_demo_memory: Callable[[], MemoryReport] | None = None,
+    run_demo_adapters: Callable[[], AdaptersDemoReport] | None = None,
+    run_security: Callable[[], SecurityReport] | None = None,
 ) -> int:
     """Run one CLI command. Returns the process exit code."""
     args = list(sys.argv[1:] if argv is None else argv)
@@ -547,6 +604,28 @@ def main(
             tier3_report = drills()
             print(tier3_report.render_text())
             if tier3_report.passed_count != tier3_report.total:
+                return 1
+            return 0
+        if command == "memory-demo":
+            if rest:
+                raise CliError("memory-demo takes no extra arguments")
+            make_report = run_demo_memory or demo_memory
+            print("Demo memory report (seeded past incidents, not a real system):")
+            print(make_report().render_text())
+            return 0
+        if command == "adapters-demo":
+            if rest:
+                raise CliError("adapters-demo takes no extra arguments")
+            make_adapters_report = run_demo_adapters or demo_adapters
+            print(make_adapters_report().render_text())
+            return 0
+        if command == "security-check":
+            if rest:
+                raise CliError("security-check takes no extra arguments")
+            review = run_security or run_security_review
+            security_report = review()
+            print(security_report.render_text())
+            if security_report.passed_count != security_report.total:
                 return 1
             return 0
         if command == "regression-check":
