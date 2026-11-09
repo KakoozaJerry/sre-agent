@@ -2,6 +2,17 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 9 November 2026 (Phase 4 starts) — bounded autonomy in the demo, with kill switch drills
+
+- Phase 4 — bounded autonomy — has started. Its first piece is Tier 3 for the demo environment: a small set of fixes the agent may run on its own, inside strict limits, with drills that prove the stop switch works. Run the drills with `sre-agent tier3-check`.
+- The grant, in plain words: in the demo environment, and only in the "shop" area, the agent may restart a workload or change how many copies of it run, without asking a human first — as long as one action touches no more than three copies. Rolling back a deploy is *not* on that list: a rollback changes which version is running, so it still needs a person's yes, every time. That split is deliberate — permission widens one fix type at a time, never all at once.
+- Fixes on this path run through one doorway: the policy engine decides, the decision is written in the audit log before anything runs, and the fix runs only if it was allowed outright. A fix that still needs approval does not run here — the person is asked, through the normal approval path, not skipped. A refused fix does not run either.
+- The drills are rehearsals, run on purpose in the demo the way a fire drill is run before a real fire. There are seven. Two prove the pre-approved fixes run and are written down. One proves rollback does not run on its own. Two prove refusals: a fix that would touch five copies is too big, and a fix aimed outside the shop area is outside the grant. The last two are the kill switch drills: a fix runs, the stop switch is pressed, and the same fix is then refused and changes nothing — and while stopped, the agent may still *look* (checking numbers changes nothing) even though it may not *fix*.
+- One design lesson shaped the kill switch drill: the stop is checked at the moment each fix would run, not remembered from when the fix was first suggested. So the drill presses the switch *between* two runs — a stop that only worked if it was set before anything started would not be much of a stop.
+- Eleven new tests cover the grant, the doorway, and the drills. All 200 tests pass, including the safety tests, and the style and type checks are clean. Measured result: 7 of 7 drills pass, 3 fixes run across the whole set — each one pre-approved, inside its limits, and written in the audit log.
+- One honest limit: this is the demo only. No real system is touched, and no other environment has been given this freedom.
+- Next in Phase 4: memory — when a new incident looks like an old one, the agent should be able to find the old one, and what fixed it.
+
 ## 9 November 2026 (afternoon) — Phase 3 is complete: hostile text changes nothing
 
 - The last piece of Phase 3 is in: the prompt-injection test set — the security check for everything the agent reads. Phase 3 (measuring the agent) is now complete.
