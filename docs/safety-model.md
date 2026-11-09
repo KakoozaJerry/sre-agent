@@ -36,6 +36,13 @@ Each action is checked against limits set per environment, for example: maximum 
 - **The approver is named and recorded.** An unnamed approval is refused, and the audit record for the approved ALLOW carries the approver's name (`approved_by`).
 - **The CLI is the approval surface for now** (`sre-agent approve-demo`, demo targets only): the person at the terminal approves the exact proposal, by name, before anything runs. Approving live server incidents is not wired yet — the server holds no runbook state.
 
+## Tier 3 in the demo, and kill switch drills (built, Phase 4)
+
+- **The demo grant is named in one place** (`tier3.py`): in the demo environment, in the `shop` namespace only, restart and scale are pre-approved, one action may touch at most three replicas, and rollback is *not* pre-approved — it changes which version runs, so it still needs a human's yes every time. No other environment has a Tier 3 grant.
+- **The Tier 3 runner runs only on an ALLOW** (`execute_tier3`): the policy decision is written to the audit log before anything runs, a decision that still needs approval runs nothing here (a human is asked through the Tier 2 flow, not skipped), and a denied action runs nothing.
+- **The halt is checked at run time.** Every run asks the policy engine again, so a halt pressed after a proposal but before a run stops that run — the same rule the approval flow follows at approval time.
+- **The drills rehearse all of this** (`sre-agent tier3-check`): seven drills — the two pre-approved fixes run and are audited; rollback does not run on its own; a fix touching five copies is refused; a fix outside `shop` is refused; a halt pressed *between* two runs stops the second and changes nothing; and while halted, read-only checks are still allowed. Measured 2026-11-09: 7 of 7 drills pass, 3 fixes run across the set.
+
 ## Runbook library (built, Phase 2)
 
 - **The library is exactly the catalogue's three fixes** (`runbooks.py`): restart, scale, rollback, for demo targets only. A test checks the library and the policy catalogue name the same set, so the two cannot drift apart.
