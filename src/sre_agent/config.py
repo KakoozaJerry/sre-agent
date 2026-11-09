@@ -15,6 +15,8 @@ class Budgets(BaseModel):
 
 class Settings(BaseModel):
     data_dir: str = "./data"
+    # How much detail the logs carry: DEBUG, INFO, WARNING or ERROR.
+    log_level: str = "INFO"
     budgets: Budgets = Field(default_factory=Budgets)
     # "mock" runs the deterministic development model; no API key needed.
     model_backend: str = "mock"
