@@ -86,14 +86,71 @@ def _layer() -> ToolLayer:
 # --- redaction -------------------------------------------------------------
 
 
+# Fake provider tokens for the redaction tests below are built in
+# pieces, on purpose. GitHub secret scanning reads the file as text
+# and refuses a file that contains a string shaped like a real token,
+# even a fake test one — that is why an earlier version of this file
+# could not be pushed. Building each fake in pieces keeps the file
+# pushable, while the value the tests use at run time is exactly the
+# same shape the redaction rules must catch.
+FAKE_AWS_KEY = "AKIA" + "ABCDEFGHIJKLMNOP"
+FAKE_SLACK_TOKEN = "xoxb-" + "123456789012-" + "abcdefghijkl"
+FAKE_GITLAB_TOKEN = "glpat-" + "abcdefghijklmnopqrstuv"
+FAKE_STRIPE_KEY = "sk_" + "live_" + "abcdefghijklmnopqrstuvwx"
+
+
 def test_redact_secrets_hides_passwords_tokens_and_keys():
     assert redact_secrets("password=hunter2") == "password=[redacted]"
     assert "hunter2" not in redact_secrets("api_key: abc123 password=hunter2")
     assert redact_secrets("Authorization: Bearer abc.def") == (
         "Authorization: [redacted]"
     )
-    assert "[redacted]" in redact_secrets("key AKIAABCDEFGHIJKLMNOP seen")
+    assert "[redacted]" in redact_secrets(f"key {FAKE_AWS_KEY} seen")
     assert redact_secrets("nothing secret here") == "nothing secret here"
+
+
+def test_redact_secrets_hides_jwts_and_embedded_passwords():
+    jwt = (
+        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0."
+        "signaturesignaturesignature"
+    )
+    assert jwt not in redact_secrets(f"auth failed token was {jwt} retrying")
+    assert redact_secrets(
+        "Server=db.example;Password=hunter2secret;Database=app"
+    ) == "Server=db.example;Password=[redacted];Database=app"
+    assert redact_secrets("https://deploy:hunter2pw@db.example.com/app") == (
+        "https://deploy:[redacted]@db.example.com/app"
+    )
+    assert 'password="hunter2quoted"' not in redact_secrets(
+        'password="hunter2quoted"'
+    )
+    assert FAKE_SLACK_TOKEN not in redact_secrets(
+        f"slack token {FAKE_SLACK_TOKEN} leaked"
+    )
+    assert FAKE_GITLAB_TOKEN not in redact_secrets(
+        f"gitlab token {FAKE_GITLAB_TOKEN} leaked"
+    )
+    assert FAKE_STRIPE_KEY not in redact_secrets(
+        f"stripe key {FAKE_STRIPE_KEY} leaked"
+    )
+    key_block = (
+        "-----BEGIN RSA PRIVATE KEY-----\n"
+        "MIIEowIBAAKCAQEAsecretbody\n"
+        "-----END RSA PRIVATE KEY-----"
+    )
+    assert "secretbody" not in redact_secrets(f"key {key_block} tail")
+
+
+def test_redact_secrets_leaves_ordinary_text_alone():
+    ordinary = [
+        "version 1.4.2 deployed to checkout.example.com",
+        "see https://example.com/health for status",
+        "commit 42f3a0c7742e8849a6f1bc4fcd5bab71deaeaa82 verified",
+        "token count is 42 and the secret santa starts soon",
+        "error rate 0.125 over a 5m window",
+    ]
+    for text in ordinary:
+        assert redact_secrets(text) == text
 
 
 def test_log_search_redacts_secrets_in_returned_lines():
