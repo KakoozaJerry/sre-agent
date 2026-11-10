@@ -27,15 +27,41 @@ Two halves, kept separate on purpose:
 
 - **Findings** (``SECURITY_FINDINGS``). The things the probes
   cannot prove away, written down with a severity and a status.
-  The largest is plain: the webhook server has no authentication
-  at all — anyone who can reach it can open incidents, close
-  them with a "resolved" alert, and read every incident back.
-  That is accepted for a server that only ever runs on one
-  person's own machine in the demo, and it must be fixed before
-  the server is shared with anyone else. The full write-up, with
-  the reasoning and the fix for each finding, is the red-team
-  report in ``docs/security-review.md``; this list and that
-  document name the same findings with the same ids.
+  The largest was plain: at review time the webhook server had
+  no authentication at all — anyone who could reach it could
+  open incidents, close them with a "resolved" alert, and read
+  every incident back. That was accepted for a server that only
+  ever runs on one person's own machine in the demo. After
+  v0.1.0 the first two findings were fixed: the server takes a
+  shared token (required on every route except ``/health`` when
+  one is set; with none set it stays a local-only server), and
+  ingestion is bounded by payload, field and store caps. The
+  third finding (F-03) was then improved: the secret cleaning
+  now also catches JSON web tokens, passwords inside connection
+  strings and inside URLs, and more provider token shapes; what
+  it still cannot promise is stated in that finding's summary.
+  The fourth finding (F-04) was then fixed: audit records are
+  hash-chained, so an edited, deleted or reordered record is
+  reported by the verifier in ``audit.py``; what a chain alone
+  cannot detect is stated in that finding's summary too.
+  The fifth finding (F-05) was then fixed: every live backend
+  address, and the CLI's server address, must pass the rules in
+  ``backend_url.py`` — https, or plain http to this machine
+  only, no credentials inside the address, and an optional host
+  allow-list that can narrow but never widen those rules —
+  before any credential can be sent to it.
+  The sixth finding (F-06) was then improved: both demo images
+  now run as a named non-root user, and the agent image installs
+  its dependencies from a lock file (``requirements.lock``) with
+  a hash for every package, checked as it installs. Pinning the
+  Compose images by digest was not done, because no verified
+  manifest digest could be produced in the build environment —
+  an invented digest would be worse than the tag it replaces —
+  and that remainder is stated in that finding's summary.
+  The statuses below say so, and the full write-up, with the
+  reasoning and the fix for each finding, is the red-team report
+  in ``docs/security-review.md``; this list and that document
+  name the same findings with the same ids.
 
 Scope, stated honestly: this is a self-review of the code in
 this repository, run against the demo backends like everything
@@ -55,9 +81,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from .adapters import KqlQueryRequest
+from .adapters import DatadogMetricsBackend, KqlQueryRequest
 from .approvals import ApprovalError, approve_pending, create_pending, execute_approved
-from .audit import AuditLog, evaluate_and_audit
+from .audit import AuditLog, evaluate_and_audit, verify_audit_records
+from .backend_url import validate_backend_url
 from .ingestion import GenericAlertPayload, IncidentStore, normalize_generic
 from .logging_config import get_logger
 from .models import IncidentStatus, Target
@@ -74,6 +101,7 @@ from .tools import (
     InMemoryLogsBackend,
     InMemoryServiceBackend,
     LogEntry,
+    PrometheusMetricsBackend,
     QueryMetricsRequest,
     SearchLogsRequest,
     ServiceStatus,
@@ -84,6 +112,11 @@ log = get_logger(__name__)
 
 CHECKOUT = Target(environment="demo", namespace="shop", service="checkout")
 PLANTED_SECRET = "hunter2-secret-value"
+# A made-up JSON web token, in the real shape: three base64url
+# parts joined by dots, the first starting with ``eyJ``.
+PLANTED_JWT = (
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwcm9iZSJ9.probesignaturepart"
+)
 
 
 class SecurityFinding(BaseModel):
@@ -106,75 +139,126 @@ SECURITY_FINDINGS: list[SecurityFinding] = [
         id="F-01",
         title="The webhook server has no authentication",
         severity="high",
-        status="accepted for the local demo only; fix before any shared use",
+        status="fixed after v0.1.0 — set a token before any shared use",
         summary=(
-            "Anyone who can reach the server can post alerts (opening "
-            "incidents, or closing them with a resolved alert) and read "
-            "every incident back. There is no token, signature or login "
-            "on any endpoint in server.py."
+            "As reviewed, anyone who could reach the server could post "
+            "alerts (opening incidents, or closing them with a resolved "
+            "alert) and read every incident back. The server now takes "
+            "a shared token (SRE_AGENT_API_TOKEN): when one is set, "
+            "every endpoint except /health requires it, webhooks and "
+            "reads alike. With no token set the server is still "
+            "unauthenticated and stays a local, one-operator server."
         ),
     ),
     SecurityFinding(
         id="F-02",
         title="Ingestion has no size or rate limits",
         severity="medium",
-        status="open",
+        status="fixed after v0.1.0 — intake is capped; no per-sender rate limit",
         summary=(
-            "An alert payload may carry any number of alerts with any "
-            "size of labels and annotations, grouped alerts add evidence "
-            "without a cap, and the in-memory incident store grows "
-            "without a bound — a flood can exhaust memory."
+            "As reviewed, an alert payload could carry any number of "
+            "alerts with any size of labels and annotations, grouped "
+            "alerts added evidence without a cap, and the in-memory "
+            "store grew without a bound. Ingestion now caps alerts per "
+            "payload, label/annotation count and size, evidence per "
+            "incident, and incidents in the store, refusing past the "
+            "caps with a clear error. A per-sender rate limit was not "
+            "added: a flood can fill the store to its cap and then "
+            "gets refusals, but it cannot grow memory without bound."
         ),
     ),
     SecurityFinding(
         id="F-03",
         title="Secret cleaning is a pattern list, not a guarantee",
         severity="medium",
-        status="known limitation, stated wherever the cleaning is described",
+        status=(
+            "improved after v0.1.0 — JWTs and more shapes added; "
+            "still a pattern list, not a guarantee"
+        ),
         summary=(
             "redact_secrets catches common shapes (password=, token=, "
-            "bearer tokens, AWS access key ids, GitHub tokens, private "
-            "key headers). It does not catch, for example, JSON web "
-            "tokens, connection strings, or unlabelled high-entropy "
-            "secrets, so a secret in an unusual shape can reach an "
-            "evidence record."
+            "bearer and basic credentials, AWS access key ids, GitHub "
+            "tokens, private-key blocks and headers) and, since the "
+            "post-release improvement, JSON web tokens, passwords "
+            "inside connection strings and inside URLs, and GitLab, "
+            "Slack and Stripe token shapes. It still does not catch "
+            "an unlabelled secret with no known prefix, or a private "
+            "key's body lines shown without their header, so a secret "
+            "in one of those shapes can reach an evidence record."
         ),
     ),
     SecurityFinding(
         id="F-04",
         title="The audit log file has no tamper protection",
         severity="low",
-        status="open",
+        status=(
+            "fixed after v0.1.0 — records are hash-chained and "
+            "verifiable; a whole-file rewrite is still not detectable"
+        ),
         summary=(
-            "Audit records are append-only in the code's own use, and "
-            "parameters are stored as a hash, but the JSON-lines file "
-            "itself is not hash-chained or signed — someone who can "
-            "edit the file can rewrite history without detection."
+            "As reviewed, audit records were append-only in the code's "
+            "own use, but the JSON-lines file itself was not "
+            "hash-chained or signed — someone who could edit the file "
+            "could rewrite history without detection. Every record now "
+            "carries the hash of the record before it and its own "
+            "hash, and verify_audit_records / verify_audit_file report "
+            "an edited, deleted or reordered record by position. What "
+            "a chain alone cannot do, stated plainly: deleting the "
+            "last records, or replacing the whole file with a freshly "
+            "recomputed chain, is still not detectable — that would "
+            "need a signature or a copy kept elsewhere."
         ),
     ),
     SecurityFinding(
         id="F-05",
         title="Live backend addresses are caller-supplied, with no allow-list",
         severity="low",
-        status="open",
+        status=(
+            "fixed after v0.1.0 — https required beyond this machine, "
+            "with an optional host allow-list"
+        ),
         summary=(
-            "The Prometheus, Kubernetes, Datadog and Azure backends, "
-            "and the CLI's server address, take a base URL from their "
-            "caller and send credentials to it as headers. Today only "
-            "operator code supplies those addresses, never telemetry; "
-            "a wrong or hostile address would receive the token."
+            "As reviewed, the Prometheus, Kubernetes, Datadog and "
+            "Azure backends, and the CLI's server address, took a "
+            "base URL from their caller with no checks and sent "
+            "credentials to it as headers. Every one of those "
+            "addresses is now checked when the backend is built "
+            "(backend_url.py): https is required for any host beyond "
+            "this machine (plain http is allowed only to localhost "
+            "or a loopback address, where the demo backends live), "
+            "an address carrying a user or password is refused, and "
+            "a caller may pass an allow-list of hosts that the "
+            "address must be on — a list can narrow where the agent "
+            "may call, never widen the https rule. Addresses still "
+            "come only from operator code or configuration, never "
+            "from telemetry."
         ),
     ),
     SecurityFinding(
         id="F-06",
         title="Demo containers and dependencies are not hardened",
         severity="low",
-        status="open",
+        status=(
+            "improved after v0.1.0 — images run as non-root and "
+            "dependencies are locked with hashes; Compose images "
+            "are still pinned by tag, not by digest"
+        ),
         summary=(
-            "The demo image runs as root, installs dependencies from "
-            "version ranges with no lock file or hashes, and the "
-            "Compose file pins Prometheus and Alertmanager by tag, "
-            "not by digest."
+            "As reviewed, the demo image ran as root, installed "
+            "dependencies from version ranges with no lock file or "
+            "hashes, and the Compose file pinned Prometheus and "
+            "Alertmanager by tag, not by digest. Both demo images "
+            "now run as a named non-root user, and the agent image "
+            "installs from requirements.lock — exact versions with "
+            "a SHA-256 hash for every package, checked with "
+            "--require-hashes as it installs (the hashes are for "
+            "the wheels pip resolved for CPython 3.12 on Linux "
+            "x86_64, the demo image's platform). What remains, "
+            "stated plainly: the Compose file still pins "
+            "Prometheus and Alertmanager by tag, not by manifest "
+            "digest, because no verified digest could be produced "
+            "in the build environment, and an invented or "
+            "unverified digest would be worse than the tag."
         ),
     ),
     SecurityFinding(
@@ -247,9 +331,20 @@ class SecurityReport(BaseModel):
             )
         lines.append(
             "Scope: a self-review of this code on demo backends. No live "
-            "system, Docker run or external tester was involved, and the "
-            "server finding (F-01) means this build must not be shared "
-            "beyond one operator's own machine as it stands."
+            "system, Docker run or external tester was involved. F-01 "
+            "and F-02 were fixed after v0.1.0, F-03 was improved "
+            "after v0.1.0 (more secret shapes cleaned; still not a "
+            "guarantee), F-04 was fixed after v0.1.0 (the audit "
+            "records are hash-chained; a whole-file rewrite is still "
+            "not detectable), F-05 was fixed after v0.1.0 "
+            "(backend addresses must be https beyond this machine, "
+            "with an optional host allow-list), and F-06 was "
+            "improved after v0.1.0 (demo images run as non-root "
+            "and dependencies install from a hashed lock file; "
+            "the Compose images are still pinned by tag, not by "
+            "digest); the server must not be "
+            "shared beyond one operator's own machine without a token "
+            "set (SRE_AGENT_API_TOKEN)."
         )
         return "\n".join(lines)
 
@@ -369,18 +464,28 @@ def _probe_audit_log_secrets() -> SecurityCheckResult:
     )
     records = audit.for_incident("probe-audit")
     dumped = " ".join(r.model_dump_json() for r in records)
+    tampered = audit.for_incident("probe-audit")
+    if tampered:
+        tampered[0].decision = "allow"
     checks = {
         "decision_was_recorded": len(records) == 1,
         "secret_value_nowhere_in_the_record": PLANTED_SECRET not in dumped,
         "fingerprint_recorded_instead": (
             len(records) == 1 and len(records[0].parameters_hash) == 64
         ),
+        "audit_chain_verifies_as_written": verify_audit_records(records) == [],
+        "an_edited_record_breaks_the_chain": (
+            bool(tampered) and verify_audit_records(tampered) != []
+        ),
     }
     return _finish(
         "audit-log-holds-no-secrets",
         "The audit log stores a fingerprint, never a secret parameter value",
         checks,
-        summary="parameters are hashed with SHA-256 before they are recorded",
+        summary=(
+            "parameters are hashed with SHA-256 before they are recorded, "
+            "and the records are hash-chained, so an edit shows"
+        ),
     )
 
 
@@ -393,7 +498,10 @@ def _probe_redaction() -> SecurityCheckResult:
                 service="checkout",
                 namespace="shop",
                 level="ERROR",
-                message=f"login failed password={PLANTED_SECRET} token=abcdef123456",
+                message=(
+                    f"login failed password={PLANTED_SECRET} "
+                    f"token=abcdef123456 jwt={PLANTED_JWT}"
+                ),
             )
         ]
     )
@@ -406,7 +514,10 @@ def _probe_redaction() -> SecurityCheckResult:
             status="degraded",
             ready_replicas=2,
             desired_replicas=3,
-            message=f"upstream said password={PLANTED_SECRET}",
+            message=(
+                f"upstream said Server=db;Password={PLANTED_SECRET};"
+                "Database=app"
+            ),
         )
     )
     layer = ToolLayer(logs=logs, services=services)
@@ -422,13 +533,19 @@ def _probe_redaction() -> SecurityCheckResult:
     checks = {
         "planted_password_redacted_everywhere": PLANTED_SECRET not in everywhere,
         "planted_token_redacted_in_logs": "abcdef123456" not in everywhere,
+        "planted_jwt_redacted_everywhere": PLANTED_JWT not in everywhere,
+        "connection_string_rest_is_kept": "Database=app" in everywhere,
         "redaction_marker_present": "[redacted]" in everywhere,
     }
     return _finish(
         "planted-secrets-redacted",
         "Secrets planted in logs and a status message are redacted before storage",
         checks,
-        summary="common secret shapes are replaced with [redacted] in the tool layer",
+        summary=(
+            "common secret shapes — labelled values, JSON web tokens, "
+            "connection-string passwords — are replaced with [redacted] "
+            "in the tool layer"
+        ),
     )
 
 
@@ -551,18 +668,61 @@ def _probe_query_guards() -> SecurityCheckResult:
     refused["promql_unbalanced"] = _refused(
         lambda: QueryMetricsRequest(query="sum(rate(http_requests_total{")
     )
+    # Backend addresses (finding F-05): a credential must never be
+    # sent over plain http to another machine, nor to a host that
+    # is off the caller's allow-list.
+    refused["backend_http_remote"] = _refused(
+        lambda: PrometheusMetricsBackend("http://metrics.example.com:9090")
+    )
+    refused["backend_allow_list_miss"] = _refused(
+        lambda: DatadogMetricsBackend(
+            "probe-key",
+            "probe-key",
+            base_url="https://api.example.com",
+            allowed_hosts=["api.datadoghq.com"],
+        )
+    )
+    refused["backend_credentials_in_url"] = _refused(
+        lambda: validate_backend_url("https://user:secret@metrics.example.com")
+    )
+    accepted: dict[str, bool] = {}
+
+    def _accepted(build: Callable[[], object]) -> bool:
+        try:
+            build()
+            return True
+        except ValueError:
+            return False
+
+    accepted["backend_https_remote"] = _accepted(
+        lambda: PrometheusMetricsBackend("https://metrics.example.com:9090")
+    )
+    accepted["backend_http_loopback"] = _accepted(
+        lambda: PrometheusMetricsBackend("http://127.0.0.1:9090")
+    )
     checks = {
         "azure_management_command_refused": refused["kql_drop"],
         "azure_management_command_after_a_read_refused": refused["kql_set"],
         "promql_with_semicolon_refused": refused["promql_semicolon"],
         "promql_over_the_length_limit_refused": refused["promql_too_long"],
         "promql_unbalanced_refused": refused["promql_unbalanced"],
+        "backend_plain_http_to_a_remote_host_refused": refused["backend_http_remote"],
+        "backend_host_off_the_allow_list_refused": refused["backend_allow_list_miss"],
+        "backend_credentials_inside_the_address_refused": (
+            refused["backend_credentials_in_url"]
+        ),
+        "backend_https_to_a_remote_host_accepted": accepted["backend_https_remote"],
+        "backend_plain_http_to_this_machine_accepted": accepted["backend_http_loopback"],
     }
     return _finish(
         "query-guards-hold",
         "Management commands and broken or oversized queries are refused",
         checks,
-        summary="query inputs are checked before they can run, in every adapter",
+        summary=(
+            "query inputs are checked before they can run, in every "
+            "adapter, and backend addresses are checked before a "
+            "credential can be sent to one (https beyond this machine)"
+        ),
     )
 
 
