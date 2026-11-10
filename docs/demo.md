@@ -68,6 +68,19 @@ http://localhost:8001/ (try `/work`, `/metrics`, `/chaos`),
 Prometheus at http://localhost:9090, and Alertmanager at
 http://localhost:9093.
 
+## How the demo images are kept tidy
+
+Two of this project's own containers — the agent and the sample
+service — run as a named user who is not root, and the agent
+image installs its Python packages from `requirements.lock` in
+the top folder: exact versions, with a hash for every package,
+checked as it installs, so the bytes that run are the bytes that
+were locked. One honest remainder, from the security review
+(finding F-06): Prometheus and Alertmanager are still pinned in
+`docker-compose.yml` by their version tags, not by image digest,
+because no verified digest could be produced where this project
+is built — an invented digest would be worse than the tag.
+
 ## What the demo does not do yet — honestly
 
 - The alert-to-incident path is live in the demo. The reasoning
