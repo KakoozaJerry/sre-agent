@@ -137,6 +137,7 @@ from . import __version__
 from .adapters import AdaptersDemoReport, demo_adapters
 from .approvals import ApprovalError, approve_pending, create_pending, execute_approved
 from .audit import AuditLog, evaluate_and_audit
+from .backend_url import validate_backend_url
 from .evaluation import EvaluationReport, run_evaluation
 from .injection import InjectionReport, run_injection_suite
 from .memory import MemoryReport, demo_memory
@@ -157,6 +158,8 @@ from .tier3 import Tier3Report, run_tier3_drills
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8080"
 ENV_BASE_URL = "SRE_AGENT_BASE_URL"
+ENV_API_TOKEN = "SRE_AGENT_API_TOKEN"
+TOKEN_HEADER = "X-SRE-Agent-Token"
 TIMEOUT_SECONDS = 5.0
 
 USAGE = """Usage:
@@ -222,7 +225,13 @@ USAGE = """Usage:
   sre-agent --version                    Print the version
 
 The server address defaults to http://127.0.0.1:8080 and can also be
-set with the SRE_AGENT_BASE_URL environment variable."""
+set with the SRE_AGENT_BASE_URL environment variable. The address
+follows the backend address rules (finding F-05): https, or plain
+http to this machine only — a plain-http address for a server on
+another machine is refused, so the token cannot cross a network
+unencrypted. If the server
+was started with a token (SRE_AGENT_API_TOKEN set), set the same
+variable for the CLI and it sends the token on every read."""
 
 
 class CliError(Exception):
@@ -238,7 +247,11 @@ def fetch_json(url: str) -> Any:
     A server that is not there, an answer that is not JSON, and an
     HTTP error are all turned into one plain sentence.
     """
-    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    headers = {"Accept": "application/json"}
+    api_token = os.environ.get(ENV_API_TOKEN)
+    if api_token:
+        headers[TOKEN_HEADER] = api_token
+    request = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             body = response.read().decode("utf-8")
@@ -341,7 +354,11 @@ def _split_base_url(args: list[str]) -> tuple[list[str], str]:
             i += 1
     if not base_url:
         raise CliError("the server address must not be empty")
-    return rest, base_url.rstrip("/")
+    try:
+        checked = validate_backend_url(base_url, what="server address")
+    except ValueError as exc:
+        raise CliError(str(exc)) from exc
+    return rest, checked
 
 
 DEMO_CHECKOUT = Target(environment="demo", namespace="shop", service="checkout")
