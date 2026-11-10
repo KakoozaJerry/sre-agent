@@ -22,6 +22,20 @@ What happens to an alert, in plain words:
 Alert text is data, never instructions. Labels and annotations are
 stored as evidence only; nothing in them is ever run or obeyed. See
 docs/safety-model.md for why that matters.
+
+Intake limits (security finding F-02, fixed after v0.1.0): every
+payload is bounded before it can grow the store — at most
+``MAX_ALERTS_PER_PAYLOAD`` alerts in one Alertmanager payload, at
+most ``MAX_METADATA_ENTRIES`` labels or annotations on one alert,
+each label or annotation key and value length-capped, and short
+fields (names, summaries) length-capped too. The store itself is
+bounded: at most ``MAX_INCIDENTS`` incidents held, and at most
+``MAX_EVIDENCE_PER_INCIDENT`` evidence records on one incident.
+Past a store cap, ingestion raises :class:`IngestionLimitError`
+and the server answers with a clear error instead of accepting
+the work. The caps bound how much memory a flood — hostile, or a
+broken sender retrying — can make the server hold. A per-sender
+rate limit was not added; that is stated plainly in the review.
 """
 
 from __future__ import annotations
@@ -30,7 +44,7 @@ import hashlib
 import json
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .logging_config import get_logger
 from .models import Evidence, Incident, IncidentStatus, Target
@@ -39,6 +53,34 @@ log = get_logger(__name__)
 
 FIRING = "firing"
 RESOLVED = "resolved"
+
+# Intake limits (F-02). Plain numbers, named once, here.
+MAX_ALERTS_PER_PAYLOAD = 100
+MAX_METADATA_ENTRIES = 50
+MAX_METADATA_KEY_LENGTH = 100
+MAX_METADATA_VALUE_LENGTH = 1000
+MAX_SHORT_TEXT_LENGTH = 200
+MAX_SUMMARY_LENGTH = 1000
+MAX_INCIDENTS = 1000
+MAX_EVIDENCE_PER_INCIDENT = 200
+
+
+class IngestionLimitError(Exception):
+    """A store intake cap was reached; the alert was not accepted."""
+
+
+def _check_metadata(values: dict[str, str]) -> dict[str, str]:
+    """Bound one labels/annotations dict: count, key and value size."""
+    if len(values) > MAX_METADATA_ENTRIES:
+        raise ValueError(
+            f"too many labels/annotations: {len(values)} > {MAX_METADATA_ENTRIES}"
+        )
+    for key, value in values.items():
+        if len(key) > MAX_METADATA_KEY_LENGTH:
+            raise ValueError("a label/annotation key is too long")
+        if len(value) > MAX_METADATA_VALUE_LENGTH:
+            raise ValueError("a label/annotation value is too long")
+    return values
 
 
 class IncomingAlert(BaseModel):
@@ -71,11 +113,16 @@ class AlertmanagerAlert(BaseModel):
 
     model_config = {"populate_by_name": True}
 
-    status: str = FIRING
+    status: str = Field(default=FIRING, max_length=MAX_SHORT_TEXT_LENGTH)
     labels: dict[str, str] = Field(default_factory=dict)
     annotations: dict[str, str] = Field(default_factory=dict)
     starts_at: datetime | None = Field(default=None, alias="startsAt")
-    fingerprint: str = ""
+    fingerprint: str = Field(default="", max_length=MAX_SHORT_TEXT_LENGTH)
+
+    @field_validator("labels", "annotations")
+    @classmethod
+    def _metadata_is_bounded(cls, v: dict[str, str]) -> dict[str, str]:
+        return _check_metadata(v)
 
 
 class AlertmanagerPayload(BaseModel):
@@ -83,28 +130,40 @@ class AlertmanagerPayload(BaseModel):
 
     model_config = {"populate_by_name": True}
 
-    status: str = FIRING
+    status: str = Field(default=FIRING, max_length=MAX_SHORT_TEXT_LENGTH)
     common_labels: dict[str, str] = Field(default_factory=dict, alias="commonLabels")
     common_annotations: dict[str, str] = Field(
         default_factory=dict, alias="commonAnnotations"
     )
-    alerts: list[AlertmanagerAlert] = Field(default_factory=list)
+    alerts: list[AlertmanagerAlert] = Field(
+        default_factory=list, max_length=MAX_ALERTS_PER_PAYLOAD
+    )
+
+    @field_validator("common_labels", "common_annotations")
+    @classmethod
+    def _common_metadata_is_bounded(cls, v: dict[str, str]) -> dict[str, str]:
+        return _check_metadata(v)
 
 
 class GenericAlertPayload(BaseModel):
     """The simple webhook body: one alert, plain fields."""
 
-    alert_name: str
-    service: str
-    namespace: str = "default"
-    environment: str = "demo"
-    severity: str = "unknown"
-    status: str = FIRING
-    fingerprint: str = ""
-    summary: str = ""
+    alert_name: str = Field(max_length=MAX_SHORT_TEXT_LENGTH)
+    service: str = Field(max_length=MAX_SHORT_TEXT_LENGTH)
+    namespace: str = Field(default="default", max_length=MAX_SHORT_TEXT_LENGTH)
+    environment: str = Field(default="demo", max_length=MAX_SHORT_TEXT_LENGTH)
+    severity: str = Field(default="unknown", max_length=MAX_SHORT_TEXT_LENGTH)
+    status: str = Field(default=FIRING, max_length=MAX_SHORT_TEXT_LENGTH)
+    fingerprint: str = Field(default="", max_length=MAX_SHORT_TEXT_LENGTH)
+    summary: str = Field(default="", max_length=MAX_SUMMARY_LENGTH)
     labels: dict[str, str] = Field(default_factory=dict)
     annotations: dict[str, str] = Field(default_factory=dict)
     starts_at: datetime | None = None
+
+    @field_validator("labels", "annotations")
+    @classmethod
+    def _metadata_is_bounded(cls, v: dict[str, str]) -> dict[str, str]:
+        return _check_metadata(v)
 
 
 def fingerprint_for_labels(labels: dict[str, str]) -> str:
@@ -206,7 +265,13 @@ class IncidentStore:
     for SQLite later does not change the webhook shapes.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        max_incidents: int = MAX_INCIDENTS,
+        max_evidence_per_incident: int = MAX_EVIDENCE_PER_INCIDENT,
+    ) -> None:
+        self._max_incidents = max_incidents
+        self._max_evidence_per_incident = max_evidence_per_incident
         self._incidents: dict[str, Incident] = {}
         self._active_by_group: dict[tuple[str, str, str, str], str] = {}
         self._incident_by_fingerprint: dict[str, str] = {}
@@ -244,11 +309,22 @@ class IncidentStore:
         grouped_id = self._active_by_group.get(alert.group_key)
         if grouped_id is not None:
             incident = self._incidents[grouped_id]
+            if len(incident.evidence) >= self._max_evidence_per_incident:
+                raise IngestionLimitError(
+                    f"incident {incident.id} already holds "
+                    f"{self._max_evidence_per_incident} evidence records; "
+                    "grouped alert refused"
+                )
             incident.add_evidence(self._evidence_for(alert))
             self._incident_by_fingerprint[alert.fingerprint] = incident.id
             log.info("alert grouped into incident %s", incident.id)
             return IngestResult(incident=incident, grouped=True)
 
+        if len(self._incidents) >= self._max_incidents:
+            raise IngestionLimitError(
+                f"incident store is full ({self._max_incidents} incidents); "
+                "new incident refused"
+            )
         incident = Incident(title=alert.title, target=alert.target)
         # Ingestion hands the incident straight to triage: the agent
         # has started looking at it. This also makes a later
