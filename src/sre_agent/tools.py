@@ -24,6 +24,10 @@ How safety is kept, in plain words:
 - **Output is data, never orders.** A tool result becomes an
   ``Evidence`` record. Nothing in it is ever run or obeyed. See
   docs/safety-model.md.
+- **Backend addresses are checked.** A live backend's address
+  must pass the rules in ``backend_url.py`` (finding F-05):
+  https, or plain http to this machine only, no credentials
+  inside the address, and an optional host allow-list.
 
 Backends sit behind small classes so the tool shapes stay the same
 when the demo backends are swapped for real ones. This pass ships
@@ -43,6 +47,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator
 
+from .backend_url import validate_backend_url
 from .logging_config import get_logger
 from .models import Evidence, Target
 
@@ -87,13 +92,59 @@ _PROMQL_NON_METRICS = {
     "unless",
 }
 
-_SECRET_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"(?i)(password|passwd|pwd|secret|token|api[_-]?key|apikey)"
-               r"(\s*[:=]\s*)\S+"),
-    re.compile(r"(?i)bearer\s+\S+"),
-    re.compile(r"AKIA[0-9A-Z]{16}"),
-    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
-    re.compile(r"gh[pousr]_[A-Za-z0-9_]{20,}"),
+# Each entry is (pattern, replacement). A replacement may refer
+# back to capture groups (``\1``) when part of the match is safe
+# to keep — a key name, a URL's scheme and user — so the cleaned
+# line still makes sense. Everything else is replaced whole.
+_SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # Labelled values: password=…, token: …, client_secret=…, …
+    # The value stops at whitespace, a semicolon, a comma or a
+    # quote, so one password inside a connection string
+    # (``Server=db;Password=…;Database=app``) is cleaned without
+    # eating the rest of the string. An opening quote is kept.
+    (
+        re.compile(
+            r"(?i)(password|passwd|pwd|client[_-]?secret|access[_-]?token"
+            r"|refresh[_-]?token|id[_-]?token|auth[_-]?token"
+            r"|session[_-]?token|secret|token|api[_-]?key|apikey"
+            r"|private[_-]?key)"
+            r"(\s*[:=]\s*[\"']?)[^\s;,\"']+"
+        ),
+        r"\1\2[redacted]",
+    ),
+    # A whole private-key block, header, body and footer together.
+    (
+        re.compile(
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?"
+            r"-----END [A-Z ]*PRIVATE KEY-----",
+            re.DOTALL,
+        ),
+        "[redacted]",
+    ),
+    # JSON web tokens (JWTs): three base64url parts joined by
+    # dots, the first part starting ``eyJ`` — the encoded form of
+    # a JSON header starting ``{"``. Requiring that start keeps
+    # ordinary dotted words and version numbers out of this rule.
+    (
+        re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"
+                   r"\.[A-Za-z0-9_-]{8,}\b"),
+        "[redacted]",
+    ),
+    # Credentials inside a URL: scheme://user:password@host —
+    # the scheme, user and host are kept, the password is not.
+    (
+        re.compile(r"([a-zA-Z][a-zA-Z0-9+.-]*://[^/\s:@]+:)[^/\s@]+(@)"),
+        r"\1[redacted]\2",
+    ),
+    (re.compile(r"(?i)bearer\s+\S+"), "[redacted]"),
+    (re.compile(r"(?i)basic\s+[A-Za-z0-9+/=]{8,}"), "[redacted]"),
+    (re.compile(r"(?:AKIA|ASIA)[0-9A-Z]{16}"), "[redacted]"),
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "[redacted]"),
+    (re.compile(r"gh[pousr]_[A-Za-z0-9_]{20,}"), "[redacted]"),
+    (re.compile(r"glpat-[A-Za-z0-9_-]{20,}"), "[redacted]"),
+    (re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"), "[redacted]"),
+    (re.compile(r"\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}\b"), "[redacted]"),
+    (re.compile(r"https://hooks\.slack\.com/services/\S+"), "[redacted]"),
 ]
 
 
@@ -101,15 +152,25 @@ def redact_secrets(text: str) -> str:
     """Replace common secret shapes in *text* with ``[redacted]``.
 
     This is a safety net, not a promise: it catches the shapes
-    secrets most often take in log lines. The first pattern keeps
-    the key name (``password=``) so the line still makes sense.
+    secrets most often take in log lines — labelled values
+    (``password=``, ``token:``, ``client_secret=``), passwords
+    inside connection strings and inside URLs, JSON web tokens,
+    bearer and basic credentials, private-key blocks and headers,
+    and the prefixed tokens of common providers (AWS, GitHub,
+    GitLab, Slack, Stripe). The labelled pattern keeps the key
+    name (``password=``) so the line still makes sense.
+
+    What it still does not catch, stated plainly (finding F-03's
+    remainder): an unlabelled secret with no known prefix and no
+    label — a random string that only its owner knows is a
+    secret — and the body lines of a private key shown without
+    their header. No pattern list can promise those; redaction
+    is defence in depth, and evidence must still be shown only
+    to the operator.
     """
     out = text
-    for idx, pattern in enumerate(_SECRET_PATTERNS):
-        if idx == 0:
-            out = pattern.sub(lambda m: f"{m.group(1)}{m.group(2)}[redacted]", out)
-        else:
-            out = pattern.sub("[redacted]", out)
+    for pattern, replacement in _SECRET_PATTERNS:
+        out = pattern.sub(replacement, out)
     return out
 
 
@@ -288,10 +349,21 @@ class PrometheusMetricsBackend:
 
     Uses only the standard library, so no new dependency is needed.
     The reply parsing lives in :func:`parse_prometheus_response`.
+    The address is checked by :func:`validate_backend_url` when
+    the backend is built (finding F-05): https, or plain http to
+    this machine only, and — when ``allowed_hosts`` is given —
+    only a host on that list.
     """
 
-    def __init__(self, base_url: str, timeout_seconds: float = 5.0) -> None:
-        self._base_url = base_url.rstrip("/")
+    def __init__(
+        self,
+        base_url: str,
+        timeout_seconds: float = 5.0,
+        allowed_hosts: list[str] | None = None,
+    ) -> None:
+        self._base_url = validate_backend_url(
+            base_url, allowed_hosts=allowed_hosts, what="Prometheus address"
+        )
         self._timeout = timeout_seconds
 
     def fetch(self, query: str) -> list[MetricSeries]:
