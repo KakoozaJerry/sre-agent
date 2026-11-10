@@ -171,3 +171,47 @@ def test_dockerfiles_and_inject_script_exist_and_agree() -> None:
     script = _read(DEMO / "inject_fault.sh")
     assert "/chaos/on" in script
     assert "/chaos/off" in script
+
+
+# ---------------------------------------------------------------------------
+# Hardening (finding F-06): non-root images, hashed dependency lock
+# ---------------------------------------------------------------------------
+
+
+def test_both_demo_images_run_as_a_named_non_root_user() -> None:
+    for path, user in (
+        (REPO_ROOT / "Dockerfile", "sreagent"),
+        (DEMO / "sample_service" / "Dockerfile", "sample"),
+    ):
+        text = _read(path)
+        assert "useradd" in text and user in text
+        assert f"\nUSER {user}\n" in text
+        assert "USER root" not in text
+
+
+def test_agent_image_installs_dependencies_from_the_hashed_lock() -> None:
+    agent_image = _read(REPO_ROOT / "Dockerfile")
+    assert "requirements.lock" in agent_image
+    assert "--require-hashes -r requirements.lock" in agent_image
+    # The package itself adds no unpinned dependencies on top.
+    assert "--no-deps" in agent_image
+
+
+def test_requirements_lock_pins_every_package_with_a_hash() -> None:
+    lock = _read(REPO_ROOT / "requirements.lock")
+    entries = [
+        line
+        for line in lock.splitlines()
+        if line and not line.startswith((" ", "#"))
+    ]
+    assert len(entries) == 17
+    for entry in entries:
+        assert "==" in entry, entry
+    hashes = [part for part in lock.split() if part.startswith("--hash=sha256:")]
+    assert len(hashes) == len(entries)
+    for hashed in hashes:
+        digest = hashed.removeprefix("--hash=sha256:")
+        assert len(digest) == 64 and all(c in "0123456789abcdef" for c in digest)
+    # The direct dependencies from pyproject.toml are all locked.
+    for name in ("pydantic==", "fastapi==", "uvicorn==", "httpx=="):
+        assert name in lock
