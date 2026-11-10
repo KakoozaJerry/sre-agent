@@ -1,9 +1,20 @@
-"""Ingestion: alerts become incidents, copies do not, groups share."""
+"""Ingestion: alerts become incidents, copies do not, groups share.
+
+The intake caps (finding F-02, fixed after v0.1.0) are pinned here
+too: payload, metadata and store bounds refuse oversize work with
+a clear error instead of growing memory without a limit.
+"""
+
+import pytest
+from pydantic import ValidationError
 
 from sre_agent.ingestion import (
+    MAX_ALERTS_PER_PAYLOAD,
+    MAX_METADATA_ENTRIES,
     AlertmanagerPayload,
     GenericAlertPayload,
     IncidentStore,
+    IngestionLimitError,
     fingerprint_for_labels,
     normalize_alertmanager,
     normalize_generic,
@@ -143,3 +154,54 @@ def test_alertmanager_end_to_end_opens_one_incident():
     ]
     assert results[0].created is True
     assert len(store.list_incidents()) == 1
+
+
+# --- F-02: intake caps ---
+
+
+def test_alertmanager_payload_over_the_alert_cap_is_refused():
+    one_alert = {
+        "status": "firing",
+        "labels": {"alertname": "HighErrorRate", "service": "checkout"},
+        "fingerprint": "abc123",
+    }
+    with pytest.raises(ValidationError):
+        _alertmanager_payload(
+            alerts=[one_alert] * (MAX_ALERTS_PER_PAYLOAD + 1)
+        )
+
+
+def test_too_many_labels_on_one_alert_are_refused():
+    labels = {f"label{i}": "x" for i in range(MAX_METADATA_ENTRIES + 1)}
+    with pytest.raises(ValidationError):
+        _generic(labels=labels)
+
+
+def test_an_overlong_label_value_is_refused():
+    with pytest.raises(ValidationError):
+        _generic(labels={"note": "x" * 1001})
+
+
+def test_an_overlong_summary_is_refused():
+    with pytest.raises(ValidationError):
+        _generic(summary="x" * 1001)
+
+
+def test_a_full_store_refuses_a_new_incident_but_still_counts_duplicates():
+    store = IncidentStore(max_incidents=1)
+    store.ingest(normalize_generic(_generic()))
+    # A repeat of the same alert adds nothing new, so it still works.
+    again = store.ingest(normalize_generic(_generic()))
+    assert again.duplicate is True
+    with pytest.raises(IngestionLimitError):
+        store.ingest(
+            normalize_generic(_generic(service="payments", fingerprint="zzz999"))
+        )
+    assert len(store.list_incidents()) == 1
+
+
+def test_grouped_alerts_stop_at_the_evidence_cap():
+    store = IncidentStore(max_evidence_per_incident=1)
+    store.ingest(normalize_generic(_generic()))
+    with pytest.raises(IngestionLimitError):
+        store.ingest(normalize_generic(_generic(fingerprint="def456")))
