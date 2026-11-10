@@ -124,3 +124,13 @@ class AuditRecord(BaseModel):
     # action that ran is the action that was decided, without storing
     # any parameter values (which may be secrets) in the log.
     parameters_hash: str = ""
+    # The hash chain (finding F-04): each record carries the hash of
+    # the record before it (``prev_hash``; the first record in a log
+    # carries the genesis value in ``audit.py``) and its own hash
+    # (``record_hash``), computed over every other field including
+    # ``prev_hash``. Editing, deleting or reordering a record breaks
+    # the chain, and ``audit.verify_audit_records`` reports where.
+    # Records written before the chain existed carry empty hashes and
+    # are reported as unchained by that check, never silently passed.
+    prev_hash: str = ""
+    record_hash: str = ""
