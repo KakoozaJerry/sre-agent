@@ -5,9 +5,13 @@ The CLI talks to the running server, so these tests pass a fake
 test_server.py for the real endpoints). No server is started.
 """
 
+import io
+import json as json_module
+import urllib.request
+
 import pytest
 
-from sre_agent.cli import CliError, format_incident_detail, main
+from sre_agent.cli import CliError, fetch_json, format_incident_detail, main
 from sre_agent.reasoning import demo_diagnosis
 
 SUMMARY_ROW = {
@@ -82,6 +86,30 @@ def test_unknown_command_is_an_error(capsys):
     assert "unknown command" in capsys.readouterr().err
 
 
+def test_fetch_json_sends_the_token_when_the_env_var_is_set(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    seen: dict[str, object] = {}
+
+    class _Response(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def fake_urlopen(request, timeout=None):
+        seen["headers"] = dict(request.header_items())
+        return _Response(json_module.dumps({"ok": True}).encode())
+
+    monkeypatch.setenv("SRE_AGENT_API_TOKEN", "cli-token")
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    assert fetch_json("http://127.0.0.1:8080/incidents") == {"ok": True}
+    headers = seen["headers"]
+    assert isinstance(headers, dict)
+    assert headers.get("X-sre-agent-token") == "cli-token"
+
+
 # --- incidents ------------------------------------------------------------------
 
 
@@ -117,6 +145,30 @@ def test_unreachable_server_is_a_plain_error_not_an_empty_list(capsys):
     captured = capsys.readouterr()
     assert "could not reach" in captured.err
     assert "No incidents" not in captured.out
+
+
+def test_plain_http_base_url_beyond_this_machine_is_refused(capsys):
+    # Finding F-05: the CLI can send the API token, so its server
+    # address follows the backend address rules — https, or plain
+    # http to this machine only. The fetch must never be called.
+    urls: list[str] = []
+    code = main(
+        ["incidents", "--base-url", "http://server.example.com:8080"],
+        fetch=_fetch_returning([], urls),
+    )
+    assert code == 1
+    assert urls == []
+    assert "plain http" in capsys.readouterr().err
+
+
+def test_https_base_url_is_accepted(capsys):
+    urls: list[str] = []
+    code = main(
+        ["incidents", "--base-url", "https://server.example.com:8443"],
+        fetch=_fetch_returning([], urls),
+    )
+    assert code == 0
+    assert urls == ["https://server.example.com:8443/incidents"]
 
 
 def test_incidents_rejects_a_non_list_answer(capsys):
