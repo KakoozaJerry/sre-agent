@@ -14,11 +14,19 @@ guide is for running the agent itself, day to day.
   the approval flow or the bounded Tier 3 grant. No real system
   is touched by any command in this guide.
 - **Do not expose the webhook server to a network other people
-  can reach.** The server has no authentication, and alert
-  intake has no size or rate limits. Those are findings F-01
-  and F-02 in [security-review.md](security-review.md), accepted
-  in writing for a local, single-operator demo only. Run it on
-  your own machine, for yourself, until those fixes land.
+  can reach — unless you have set a token.** With no token set,
+  the server has no authentication: that was finding F-01 in
+  [security-review.md](security-review.md), accepted in writing
+  for a local, single-operator demo only. After v0.1.0 the fix
+  exists: set `SRE_AGENT_API_TOKEN` before you start the server
+  and every endpoint except `/health` requires that token (see
+  "Run the server"). Finding F-02 is fixed too: alert intake is
+  now capped — at most 100 alerts in one payload, bounded labels
+  and annotations, at most 200 evidence records on one incident
+  and 1,000 incidents in the store — and past a cap the server
+  refuses with a clear error. One honest remainder: there is
+  still no per-sender *rate* limit, so a flood can fill the
+  store to its cap; it just cannot grow memory without bound.
 - Everything the server knows lives in its memory. Stop the
   server and its incidents are gone. That is the current design,
   not a bug to work around — there is no database yet.
@@ -71,6 +79,32 @@ It answers `{"status":"ok"}`. The endpoints are:
   each.
 - `GET /incidents/{id}` — one incident in full.
 
+### Protect the server with a token
+
+By default the server runs token-less, for one operator on their
+own machine. Before anyone else can reach it, set a token:
+
+```bash
+SRE_AGENT_API_TOKEN='choose-a-long-random-value' \
+  uvicorn sre_agent.server:app --port 8080
+```
+
+From then on, every endpoint except `GET /health` needs that
+exact value in the `X-SRE-Agent-Token` header; a missing or
+wrong token gets a `401` and nothing is ingested or shown. By
+hand, that is:
+
+```bash
+curl -H 'X-SRE-Agent-Token: choose-a-long-random-value' \
+  http://localhost:8080/incidents
+```
+
+The CLI sends the header for you when the same variable is set
+in its environment (see the next section). Alertmanager can send
+it too, from its webhook receiver's `http_config`. Keep the
+token out of the repository and out of logs — it is a shared
+secret, not a configuration detail.
+
 Send a test alert by hand:
 
 ```bash
@@ -96,7 +130,23 @@ sre-agent show <incident-id>   # one incident in full
 The server address defaults to `http://127.0.0.1:8080`. Use
 `--base-url URL` on either command, or set the
 `SRE_AGENT_BASE_URL` environment variable, if you ran the
-server somewhere else.
+server somewhere else. If the server was started with a token,
+set `SRE_AGENT_API_TOKEN` to the same value for the CLI and it
+sends the token header on every read; without it, the server
+answers `401` and the CLI reports a plain server error.
+
+The address follows the backend address rules (finding F-05,
+fixed after v0.1.0, in `backend_url.py`): it must be an
+`https://` address, or a plain `http://` address only when the
+server is on this same machine (`localhost`, `127.0.0.1`,
+`::1`). A plain-http address for a server on another machine
+is refused with a plain reason, before anything is sent — the
+CLI can carry your token, and a token must not cross a network
+unencrypted. The same rules guard every live backend address
+(Prometheus, Kubernetes, Datadog, Azure Monitor) in code, and
+a backend may also be given an allow-list of hosts it may
+call; the list can only narrow where it may call, never widen
+the https rule.
 
 Two honest limits, by design:
 
@@ -187,9 +237,18 @@ In the demo commands the log lives in the process and its size
 is printed at the end of the run (for example, `approve-demo`
 reports how many decisions it holds for its incident). In code,
 `AuditLog` in `audit.py` can also write one JSON record per
-line to a file; read it back with any JSON-lines tool. One
-known limit (finding F-04): the file is not tamper-proof — an
-edit to it would not be detected.
+line to a file; read it back with any JSON-lines tool.
+
+The records are also chained together (finding F-04, fixed
+after v0.1.0): each record carries the hash of the record
+before it and its own hash, so an edit, a deletion from the
+middle, or a reordering breaks the chain. Check a file with
+`verify_audit_file` in `audit.py` — it returns a list of
+problems, empty when the chain is intact. Two limits, stated
+plainly: deleting the last records, or replacing the whole
+file with a freshly recomputed chain, is not detected — that
+would need a signature or a copy kept elsewhere — and the
+chain shows an edit happened; it does not stop one.
 
 ## Settings
 
@@ -208,9 +267,24 @@ level, which part wrote it, and the message.
 - **"could not reach the agent server"** — the server is not
   running, or not at that address. Start it (above), or point
   the CLI at it with `--base-url` / `SRE_AGENT_BASE_URL`.
+- **"server address uses plain http to a host that is not on
+  this machine"** — the address rules (F-05) refused the
+  `--base-url` before anything was sent. Use the server's
+  `https://` address, or run the CLI on the same machine as a
+  plain-http local server.
 - **"the server says that incident does not exist"** — the id
   is wrong, or the server was restarted and its in-memory
   incidents are gone. List what it knows: `sre-agent incidents`.
+- **HTTP 401 from the server, or a plain server error from the
+  CLI** — the server was started with a token and the request
+  did not carry it (or carried a different one). Set
+  `SRE_AGENT_API_TOKEN` to the server's token for the CLI, or
+  send the `X-SRE-Agent-Token` header by hand.
+- **HTTP 429 or 422 on a webhook** — an intake cap was hit
+  (F-02): too many alerts in one payload, oversize labels or
+  annotations, a full evidence record, or a full incident store.
+  The error message names which cap; a flood sender should be
+  fixed or blocked, not accommodated by raising caps blindly.
 - **An incident shows "Diagnosis: none yet"** — expected for
   live server incidents today; see the limit above.
 - **A fix was refused that you expected to run** — read the
@@ -227,7 +301,8 @@ level, which part wrote it, and the message.
 ## The short version
 
 Install it, keep the tests green, run the server on your own
-machine only, watch incidents with the CLI, approve demo fixes
+machine only (or set a token before anyone else can reach it),
+watch incidents with the CLI, approve demo fixes
 by name and one at a time, and run the check commands after any
 change. Everything this guide claims is in the code today;
 where a piece is not built yet — a live halt command, server-side
