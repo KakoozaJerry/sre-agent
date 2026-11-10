@@ -54,6 +54,36 @@ def test_findings_record_the_unauthenticated_server_first() -> None:
     assert "no authentication" in first.title
 
 
+def test_f04_status_records_the_post_release_fix() -> None:
+    f04 = next(f for f in SECURITY_FINDINGS if f.id == "F-04")
+    assert "fixed after v0.1.0" in f04.status
+    assert "hash-chained" in f04.summary
+    assert "whole file" in f04.summary
+
+
+def test_f05_status_records_the_post_release_fix() -> None:
+    f05 = next(f for f in SECURITY_FINDINGS if f.id == "F-05")
+    assert "fixed after v0.1.0" in f05.status
+    assert "https" in f05.summary
+    assert "allow-list" in f05.summary
+    assert "never from telemetry" in f05.summary
+
+
+def test_f06_status_records_the_post_release_improvement() -> None:
+    f06 = next(f for f in SECURITY_FINDINGS if f.id == "F-06")
+    assert "improved after v0.1.0" in f06.status
+    assert "non-root" in f06.summary
+    assert "requirements.lock" in f06.summary
+    assert "still pins" in f06.summary or "still pinned" in f06.summary
+
+
+def test_f03_status_records_the_post_release_improvement() -> None:
+    f03 = next(f for f in SECURITY_FINDINGS if f.id == "F-03")
+    assert "improved after v0.1.0" in f03.status
+    assert "JSON web tokens" in f03.summary
+    assert "still does not catch" in f03.summary
+
+
 def test_every_finding_has_a_severity_and_a_status() -> None:
     for finding in SECURITY_FINDINGS:
         assert finding.severity in {"high", "medium", "low", "info"}
