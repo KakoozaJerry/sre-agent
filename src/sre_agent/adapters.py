@@ -30,6 +30,11 @@ How safety is kept, the same rules as the tool layer:
   backends take their API keys or token as arguments from the
   caller — nothing here reads a key from a file, logs one, or
   has one in its code.
+- **Backend addresses are checked.** Every live backend's
+  address must pass the rules in ``backend_url.py`` (finding
+  F-05) before a credential can be sent to it: https, or plain
+  http to this machine only, no credentials inside the address,
+  and an optional host allow-list per backend.
 - **Replies are parsed by pure functions.** Each system's reply
   shape is turned into this project's own models by a function
   that takes the decoded reply and nothing else, so the parsing
@@ -59,6 +64,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from .backend_url import validate_backend_url
 from .logging_config import get_logger
 from .models import Evidence
 from .tools import (
@@ -251,9 +257,15 @@ class KubernetesApiBackend:
     """
 
     def __init__(
-        self, base_url: str, token: str | None = None, timeout_seconds: float = 5.0
+        self,
+        base_url: str,
+        token: str | None = None,
+        timeout_seconds: float = 5.0,
+        allowed_hosts: list[str] | None = None,
     ) -> None:
-        self._base_url = base_url.rstrip("/")
+        self._base_url = validate_backend_url(
+            base_url, allowed_hosts=allowed_hosts, what="Kubernetes API address"
+        )
         self._token = token
         self._timeout = timeout_seconds
 
@@ -395,10 +407,13 @@ class DatadogMetricsBackend:
         base_url: str = "https://api.datadoghq.com",
         window_seconds: int = 3600,
         timeout_seconds: float = 5.0,
+        allowed_hosts: list[str] | None = None,
     ) -> None:
         self._api_key = api_key
         self._app_key = app_key
-        self._base_url = base_url.rstrip("/")
+        self._base_url = validate_backend_url(
+            base_url, allowed_hosts=allowed_hosts, what="Datadog address"
+        )
         self._window_seconds = window_seconds
         self._timeout = timeout_seconds
 
@@ -576,10 +591,13 @@ class AzureLogAnalyticsBackend:
         base_url: str = "https://api.loganalytics.azure.com",
         timespan: str = "PT1H",
         timeout_seconds: float = 5.0,
+        allowed_hosts: list[str] | None = None,
     ) -> None:
         self._workspace_id = workspace_id
         self._token = token
-        self._base_url = base_url.rstrip("/")
+        self._base_url = validate_backend_url(
+            base_url, allowed_hosts=allowed_hosts, what="Azure Monitor address"
+        )
         self._timespan = timespan
         self._timeout = timeout_seconds
 
