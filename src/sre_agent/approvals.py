@@ -23,10 +23,15 @@ In plain words, this is the Tier 2 path from the safety model:
    if the run itself fails, so it can never be replayed for a
    second run. A second run needs a new proposal and a new yes.
 
-Scope, stated honestly: everything here works in one process,
-against the demo runbook backend, like the rest of the Phase 2
-pieces. Approving a live server incident is not wired yet — the
-server holds no runbook state — and nothing here claims it is.
+Scope, stated honestly: this module is the one approval flow,
+used in two places. The CLI's ``approve-demo`` runs it in one
+process against the demo runbook backend. Since Phase 7 the
+server runs the same functions for live incidents when it is
+built with a policy and a runbook backend (see ``server.py``):
+the pending actions, grants and re-checks are exactly these,
+held by the server instead of one terminal process. Either way
+the backend is still the demo backend today — no real system is
+acted on — and nothing here claims otherwise.
 """
 
 from __future__ import annotations
