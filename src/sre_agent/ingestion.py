@@ -43,11 +43,15 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, field_validator
 
 from .logging_config import get_logger
 from .models import Evidence, Incident, IncidentStatus, Target
+
+if TYPE_CHECKING:
+    from .approvals import PendingAction
 
 log = get_logger(__name__)
 
@@ -262,7 +266,23 @@ class IncidentStore:
 
     This is the small store interface the plan talks about: webhooks
     and (later) tools talk to this class, so swapping the memory here
-    for SQLite later does not change the webhook shapes.
+    for SQLite later does not change the webhook shapes. That swap
+    now exists: ``storage.SQLiteIncidentStore`` keeps the same
+    interface and adds persistence behind it (see ``storage.py``).
+
+    The interface now also carries the two hooks a persistent store
+    needs and an in-memory store can answer trivially:
+
+    - ``save(incident)`` — an incident changed outside ingestion
+      (a diagnosis was written on it, a fix ran on it): keep the
+      change. In memory the record is already the object held, so
+      this only makes sure it is in the store; a database store
+      writes it through.
+    - ``load_approvals()`` / ``save_approval(pending, decision)`` —
+      the server's pending approvals, so a database-backed server
+      can restore them after a restart. In memory there is nothing
+      extra to load or write: the server's own dicts are the record,
+      and they are lost on restart, exactly as before.
     """
 
     def __init__(
@@ -285,6 +305,37 @@ class IncidentStore:
 
     def duplicate_count(self, incident_id: str) -> int:
         return self._duplicate_counts.get(incident_id, 0)
+
+    def save(self, incident: Incident) -> None:
+        """Keep a change made to *incident* outside ingestion.
+
+        In memory this is almost a no-op — the store already holds
+        this exact object — but it is the hook a persistent store
+        overrides to write the change through, and callers (the
+        server, after a diagnosis or a run) must call it rather
+        than assume their mutation was kept.
+        """
+        self._incidents[incident.id] = incident
+
+    def load_approvals(
+        self,
+    ) -> tuple[dict[str, PendingAction], dict[str, str]]:
+        """Pending approvals a previous run of the server left behind.
+
+        An in-memory store kept none across a restart, so there is
+        nothing to restore.
+        """
+        return {}, {}
+
+    def save_approval(
+        self, pending: PendingAction, decision: str | None
+    ) -> None:
+        """Keep one pending approval (and its decision, if decided).
+
+        In memory the server's own dicts are the record, so there
+        is nothing extra to write; a database store persists the
+        pending action so a restart restores it.
+        """
 
     def ingest(self, alert: IncomingAlert) -> IngestResult:
         if alert.status == RESOLVED:
