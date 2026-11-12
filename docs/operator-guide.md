@@ -5,7 +5,13 @@ healthy. Written for the one person operating it today: a single
 operator, on their own machine, against the demo environment.
 
 If you only want the demo, start with [demo.md](demo.md). This
-guide is for running the agent itself, day to day.
+guide is for running the agent itself, day to day. New to the
+agent? The README's walkthrough (the "Walkthrough: one alert,
+end to end" section of the Quick start) takes one alert
+through the whole live path on the shipped server — send an
+alert, read a diagnosis, approve an action, close the
+incident — and every step in it was run against a real server
+before it was written down.
 
 ## Before you start — what this build is, and is not
 
@@ -27,14 +33,32 @@ guide is for running the agent itself, day to day.
   refuses with a clear error. One honest remainder: there is
   still no per-sender *rate* limit, so a flood can fill the
   store to its cap; it just cannot grow memory without bound.
-- Everything the server knows lives in its memory. Stop the
-  server and its incidents are gone. That is the current design,
-  not a bug to work around — there is no database yet.
+- By default, everything the server knows lives in its memory.
+  Stop the server and its incidents are gone. A database store
+  now exists for servers built in code (see "Keep incidents in
+  a database file" below); the shipped server app still uses
+  the in-memory store, so its incidents are still gone on a
+  restart — that is its current design, not a bug.
 
 ## Install
 
-You need Python 3.11 or newer. From the top folder of the
-repository:
+You need Python 3.11 or newer. The one-command way, from the
+top folder of a fresh clone (macOS and Linux):
+
+```bash
+./quickstart.sh
+```
+
+The script makes the private Python folder (`.venv`), installs
+`sre-agent` with its server parts, and proves the install: it
+prints the version, runs one demo diagnosis, and runs the five
+scored chaos scenarios (5 of 5 must pass). If any step fails it
+stops there. It was verified from a clean environment — a fresh
+copy with no `.venv` and no installed package — on
+12 November 2026. After it, the commands below live in
+`.venv/bin/` (for example `.venv/bin/sre-agent incidents`).
+
+By hand, the same install is:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -78,6 +102,12 @@ It answers `{"status":"ok"}`. The endpoints are:
 - `GET /incidents` — the incidents the server knows, one summary
   each.
 - `GET /incidents/{id}` — one incident in full.
+- `POST /incidents/{id}/actions` — propose a runbook fix for a
+  diagnosed incident (see "Approve a fix" below).
+- `GET /incidents/{id}/approvals` — that incident's approvals,
+  with their state (pending, approved, rejected, expired).
+- `POST /incidents/{id}/approvals/{pending-id}/approve` and
+  `.../reject` — a named human's decision on one pending fix.
 
 ### Protect the server with a token
 
@@ -118,6 +148,39 @@ incident, not a new incident. An alert with `"status":"resolved"`
 for the same service, namespace, environment and alert name
 closes the incident.
 
+## Keep incidents in a database file (optional)
+
+A server built in code can keep its incidents in one SQLite
+database file instead of in memory, using
+`SQLiteIncidentStore` from `sre_agent.storage`:
+
+```python
+from sre_agent.storage import SQLiteIncidentStore
+from sre_agent.server import create_app
+
+store = SQLiteIncidentStore("sre-agent.db")
+app = create_app(store=store, tool_layer=..., approval_policy=...,
+                 runbook_backend=...)
+```
+
+What survives a restart, in plain words: the incidents with
+everything on them — status, evidence, possible causes, the
+diagnosis, and any memory advice — plus the counts of duplicate
+alerts and the rules for recognising them, so a repeated alert
+is still a duplicate afterwards and a resolved alert still
+closes its incident. Pending approvals survive too: a proposal
+waiting for a human is still waiting afterwards, with the same
+expiry time it was given (a restart does not extend its
+15 minutes), and an approval that was already decided stays
+decided, so it cannot be run twice across a restart.
+
+Two honest limits: the store is one file for one operator —
+it is not a shared database for several servers at once — and
+the shipped server app still uses the in-memory store, so
+this only applies to a server you build in code, as above.
+The audit log is separate: it lives in the server process
+unless code hands it a file (see "The audit log").
+
 ## Watch incidents from the terminal
 
 The command-line tool reads the running server:
@@ -153,10 +216,27 @@ Two honest limits, by design:
 - If the server is not running, the tool says so plainly, with
   the command to start it. It never prints an empty list that
   would look like "no incidents".
-- The server does not run the diagnosis step yet, so a live
-  incident usually shows "Diagnosis: none yet". To see a
-  diagnosis today, run the seeded demo one, which needs no
-  server at all: `sre-agent diagnose`.
+- Diagnosis depends on how the server was built. The shipped
+  server app runs the diagnosis step itself, from the seeded
+  demo tool data: a new alert is diagnosed as it arrives, and
+  `sre-agent show` prints that diagnosis with its causes and
+  evidence. The shipped app also selects the seeded demo read
+  adapters (Kubernetes, Datadog, Azure Monitor) as extra
+  evidence sources, so its diagnoses carry their answers too;
+  a server built in code can pass its own adapter bundle
+  (`create_app(adapters=...)`) or none at all. The shipped
+  app also carries the seeded demo memory, so a diagnosis it
+  makes has that memory's advice attached — similar past
+  incidents and suggested runbooks, printed by
+  `sre-agent show` under "Memory advice (advice only...)".
+  That advice is worked out after the diagnosis is decided:
+  it changes no claim or cause, it creates no proposal, and
+  a suggested fix still needs the normal proposal and
+  approval below. A server built in code can pass its own
+  memory (`create_app(memory=...)`) or none at all. A server built
+  with no tool layer records incidents only, so its incidents
+  show "Diagnosis: none yet". Either way, the seeded demo
+  diagnosis needs no server at all: `sre-agent diagnose`.
 
 ## The commands that need no server
 
@@ -180,6 +260,72 @@ Run the four checks — `evaluate`, `regression-check`,
 any change, before you trust the build again. They are quick,
 and together they are the measured answer to "is it still
 safe?".
+
+Phase 7 closed with an evaluation gate: all five suites were
+re-run with the live path wired, and they passed unchanged —
+scenarios 5 of 5, the regression gate against the v0.1.0
+baseline, hostile-text cases 8 of 8, Tier 3 drills 7 of 7, and
+security probes 10 of 10, with 0 unsafe actions. A test file
+(`tests/test_evaluation_gate.py`) pins that gate: it runs the
+five suites together and checks a fully wired server — tool
+layer, read adapters, memory, live approvals and a database
+store all switched on at once — diagnosing with evidence,
+running nothing on its own, surviving a restart, and letting
+a named human approve a fix exactly once. If that file fails,
+the live path has broken a promise the separate suites made.
+
+## Diagnosis backend: plain rules by default, a model only if you wire one
+
+Every diagnosis is read by a *backend* (`model_backend.py`),
+and the report names which one ran. The default — in the demo,
+the CLI, the checks above and the shipped server — is the
+deterministic backend: plain rules over the gathered evidence,
+no model call and no API key, so every diagnosis can be
+checked exactly.
+
+A language-model backend also exists, and it is
+off by default. There is no setting, environment variable
+or CLI flag for it: the only way to turn it on is to build one in
+your own code, around your own model client, and hand it in
+on purpose:
+
+```python
+from sre_agent.model_backend import LanguageModelBackend
+from sre_agent.reasoning import ReasoningLoop
+
+loop = ReasoningLoop(
+    tool_layer, backend=LanguageModelBackend(your_client)
+)
+# or, on a server: create_app(tool_layer=..., diagnosis_backend=...)
+```
+
+Your client is any object with one method,
+`complete(prompt) -> str` — text in, text out. This
+repository ships no real model client: which provider, model
+and key to use is your decision, and your key never passes
+through this project's code or configuration.
+
+The model's reply is checked as untrusted input before any
+of it can become a claim. It must be one JSON object with
+only two keys, `claims` and `hypotheses`; each entry may
+carry only a statement, the evidence ids behind it, and a
+confidence between 0 and 1, and every id it cites must be a
+real evidence record gathered for that incident. An entry
+carrying any other field — a runbook name, say — is dropped;
+a reply with a top-level field beyond the two keys is
+refused whole; and a client that fails, or a reply that is
+not JSON, leaves the backend with nothing to say, so the
+incident escalates to a human exactly as it does when the
+evidence is thin. The backend proposes wording inside a
+diagnosis only: it proposes no action, runs nothing, and
+approves nothing.
+
+One caution, stated plainly: every published score in this
+project so far is the deterministic backend's. The model
+backend has not been scored on the chaos, regression and
+hostile-text suites, and it is not recommended until it has
+been, with its scores published separately — that is the
+last item of Phase 9, and it has not happened yet.
 
 ## Approve a fix (Tier 2, demo only)
 
@@ -205,13 +351,63 @@ What to know before you approve:
   environment was halted or tightened after the proposal, the
   refusal stands and is written in the audit log. A human's yes
   does not override the limits.
-- Approving a live server incident is not wired yet — this
-  command approves demo fixes in its own process only.
+- This command approves demo fixes in its own process. Live
+  server incidents are approved on the server itself — the next
+  section — under exactly the same rules.
+
+## Approve a fix on the server (Tier 2, live path)
+
+The shipped server holds the same approval flow for its own
+incidents, acting on the seeded demo workloads. A fix is
+proposed for one diagnosed incident, decided by the policy
+engine, and run only after a named human approves that exact
+pending action:
+
+```bash
+# 1. Propose a restart for a diagnosed incident.
+curl -X POST http://localhost:8080/incidents/<incident-id>/actions \
+  -H 'Content-Type: application/json' \
+  -d '{"runbook_id":"restart-workload"}'
+#    → 201, with the pending approval's id, its target, how many
+#      replicas it touches, and when it expires (15 minutes).
+
+# 2. See what is waiting on that incident.
+curl http://localhost:8080/incidents/<incident-id>/approvals
+
+# 3. Approve it, by name — or reject it the same way, at
+#    .../reject. The approved fix then runs, once.
+curl -X POST \
+  http://localhost:8080/incidents/<incident-id>/approvals/<pending-id>/approve \
+  -H 'Content-Type: application/json' \
+  -d '{"by":"<your name>"}'
+```
+
+What to know before you approve:
+
+- The proposal cannot name a target. It always acts on the
+  target pinned on the incident, and how many replicas it
+  touches is counted from the workload's real state.
+- Only a diagnosed incident can have a fix proposed. A server
+  built with no policy or no runbook backend holds no
+  approvals at all, and these routes answer `409` saying so.
+- The rules are the demo rules above, unchanged: named
+  approver, 15-minute expiry, one use only (a failed run
+  spends the approval too), and the policy engine decides
+  again at approval time — a halt set after the proposal
+  makes the approval fail, and that refusal is audited.
+- A successful run is written on the incident as evidence and
+  moves it to "mitigating". It does **not** mark the incident
+  resolved: the server has not checked the fix worked, so
+  resolution still comes from a resolved alert.
+- If the server was started with a token, every one of these
+  routes needs the token header, exactly like the webhooks.
 
 ## Stop the agent
 
 - **Stop the server:** Ctrl-C in its terminal, or stop the
-  process. Everything stops; the in-memory incidents are lost.
+  process. Everything stops; with the default in-memory store
+  the incidents are lost, and with a database store (above)
+  they are in its file, ready for the next start.
 - **The halt switch, stated honestly:** the safety model speaks
   of a halt that blocks mutations while reads continue. In code
   today that halt is a setting on an environment's policy
@@ -219,10 +415,12 @@ What to know before you approve:
   would run, and it is exercised by the Tier 3 drills
   (`sre-agent tier3-check`) and the demo policies. There is **no
   `sre-agent halt` command in this build yet** — for the running
-  server, stopping the process is the halt, and since the server
-  never runs fixes, stopping it loses nothing that could act.
-  A live halt command belongs with the work that wires fixes to
-  the server, and until then this guide will keep saying so.
+  server, stopping the process is the halt: it stops everything,
+  including any fix the server might have run. The policy's
+  `halted` setting is the finer switch — on a server built with
+  a policy, it is re-checked when an approval is given, so a
+  halt set after a proposal refuses that approval — but there
+  is no live command that flips it on a running server yet.
 
 ## The audit log
 
@@ -235,7 +433,10 @@ the log.
 
 In the demo commands the log lives in the process and its size
 is printed at the end of the run (for example, `approve-demo`
-reports how many decisions it holds for its incident). In code,
+reports how many decisions it holds for its incident). On the
+server, the proposal and approval decisions for its incidents
+live in the server process's own audit log, held the same way.
+In code,
 `AuditLog` in `audit.py` can also write one JSON record per
 line to a file; read it back with any JSON-lines tool.
 
@@ -274,7 +475,8 @@ level, which part wrote it, and the message.
   plain-http local server.
 - **"the server says that incident does not exist"** — the id
   is wrong, or the server was restarted and its in-memory
-  incidents are gone. List what it knows: `sre-agent incidents`.
+  incidents are gone (a database store keeps them; see above).
+  List what it knows: `sre-agent incidents`.
 - **HTTP 401 from the server, or a plain server error from the
   CLI** — the server was started with a token and the request
   did not carry it (or carried a different one). Set
@@ -285,8 +487,11 @@ level, which part wrote it, and the message.
   annotations, a full evidence record, or a full incident store.
   The error message names which cap; a flood sender should be
   fixed or blocked, not accommodated by raising caps blindly.
-- **An incident shows "Diagnosis: none yet"** — expected for
-  live server incidents today; see the limit above.
+- **An incident shows "Diagnosis: none yet"** — the server was
+  built with no tool layer, so it records incidents only; the
+  shipped server app diagnoses as alerts arrive. An incident
+  the loop could not diagnose is handed to a human instead
+  ("escalated") and also shows no diagnosis.
 - **A fix was refused that you expected to run** — read the
   reason; every refusal states it. The usual causes: the
   runbook is not on the allow-list, the action touches more
@@ -305,6 +510,5 @@ machine only (or set a token before anyone else can reach it),
 watch incidents with the CLI, approve demo fixes
 by name and one at a time, and run the check commands after any
 change. Everything this guide claims is in the code today;
-where a piece is not built yet — a live halt command, server-side
-diagnosis, live approvals — the guide says so instead of
-implying otherwise.
+where a piece is not built yet — a live halt command — the
+guide says so instead of implying otherwise.
