@@ -197,3 +197,18 @@ def test_cli_memory_demo_prints_report_and_exits_zero(capsys) -> None:  # type: 
 def test_cli_memory_demo_rejects_extra_arguments(capsys) -> None:  # type: ignore[no-untyped-def]
     assert main(["memory-demo", "extra"]) == 1
     assert "no extra arguments" in capsys.readouterr().err
+
+
+def test_demo_incident_memory_holds_the_seeded_past() -> None:
+    from sre_agent.memory import demo_incident_memory
+
+    memory = demo_incident_memory()
+    assert len(memory) == 4
+    assert [i.id for i in memory.incidents()] == [
+        "past-checkout-1",
+        "past-checkout-2",
+        "past-checkout-3",
+        "past-search-1",
+    ]
+    # The factory and the demo report describe the same past.
+    assert demo_memory().past_incidents_held == len(memory)
