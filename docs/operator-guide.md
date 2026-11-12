@@ -320,6 +320,24 @@ evidence is thin. The backend proposes wording inside a
 diagnosis only: it proposes no action, runs nothing, and
 approves nothing.
 
+A model may also *propose a fix*, through a separate channel
+(`model_proposals.py`) that an operator builds and calls in
+their own code the same way — there is no setting, flag or
+shipped wiring for it either, and a diagnosis reply still may
+not carry an action. A model proposal is treated exactly like
+any other proposal: it is built by the same `build_action`
+(parameters validated, replicas touched counted from the
+workload's real state, target always the one pinned on the
+incident — a proposal reply carrying a target, an approver or
+a decision field is refused whole), decided by the same
+policy engine, written to the same audit log before anything
+can run, and held as the same pending action when it needs a
+human. The model can propose, never approve: the proposer has
+no approve step, a submission can produce a pending action
+but never a grant, and a model-proposed fix runs before a
+human's yes only when the policy itself allows it outright —
+a Tier 3 grant a human wrote into the policy in advance.
+
 One caution, stated plainly: every published score in this
 project so far is the deterministic backend's. The model
 backend has not been scored on the chaos, regression and
