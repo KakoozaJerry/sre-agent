@@ -49,9 +49,17 @@ Kubernetes cluster (kind or otherwise), Datadog account or Azure
 workspace was available in the build environment, so no live
 call is claimed as tested; running against a real kind cluster
 is a human check, the same status the Docker demo had at first.
-Nothing here is wired into the reasoning loop yet: an adapter
-result becomes an evidence record, and feeding those records
-into a live diagnosis is later work.
+
+Feeding a diagnosis (Phase 7): an operator may select any of
+these adapters as extra evidence sources for the reasoning loop
+by handing an :class:`AdapterSources` bundle to it (or to the
+server, which passes it on). That selection is the only wiring:
+the loop asks each selected adapter one fixed question, built
+only from the incident's validated target names, and the answers
+become evidence records on the incident like any other. An
+adapter that is not selected is never called, and a selected
+adapter that fails is skipped — it never takes the diagnosis
+down with it.
 """
 
 from __future__ import annotations
@@ -60,6 +68,7 @@ import json
 import re
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
@@ -650,6 +659,107 @@ class AzureAdapter:
 
 
 # ---------------------------------------------------------------------------
+# Selecting adapters as evidence sources for a diagnosis
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AdapterSources:
+    """The read adapters selected to feed a diagnosis.
+
+    Every field is optional: a source left as ``None`` is never
+    called. This bundle is how an operator selects evidence
+    sources — for the reasoning loop directly, or for a server,
+    which passes the bundle to its loop. The live adapters inside
+    a bundle were built by the operator's own code, so their
+    addresses already passed the backend address rules
+    (``backend_url.py``) when they were constructed; nothing in
+    an alert, a log line or any other telemetry can add a source
+    or change an address.
+    """
+
+    kubernetes: KubernetesReader | None = None
+    datadog: DatadogAdapter | None = None
+    azure: AzureAdapter | None = None
+
+
+def _demo_kubernetes_reader() -> KubernetesReader:
+    return KubernetesReader(
+        InMemoryKubernetesBackend(
+            [
+                PodStatus(
+                    name="checkout-7d9f-a", namespace="shop", phase="Running",
+                    ready_containers=1, total_containers=1, restarts=2,
+                    service="checkout",
+                ),
+                PodStatus(
+                    name="checkout-7d9f-b", namespace="shop", phase="Running",
+                    ready_containers=1, total_containers=1, restarts=0,
+                    service="checkout",
+                ),
+                PodStatus(
+                    name="checkout-7d9f-c", namespace="shop", phase="Pending",
+                    ready_containers=0, total_containers=1, restarts=5,
+                    service="checkout",
+                ),
+                PodStatus(
+                    name="search-5c1-a", namespace="shop", phase="Running",
+                    ready_containers=1, total_containers=1, restarts=0,
+                    service="search",
+                ),
+            ]
+        )
+    )
+
+
+def _demo_datadog_adapter() -> DatadogAdapter:
+    now = datetime.now(UTC)
+    backend = InMemoryDatadogBackend()
+    backend.add_series(
+        "http_request_errors_total",
+        {"service": "checkout", "namespace": "shop"},
+        [MetricSample(timestamp=now, value=162.0)],
+    )
+    return DatadogAdapter(backend)
+
+
+def _demo_azure_adapter() -> AzureAdapter:
+    now = datetime.now(UTC)
+    return AzureAdapter(
+        InMemoryAzureBackend(
+            [
+                {
+                    "TimeGenerated": now.isoformat(),
+                    "Service": "checkout",
+                    "Level": "Error",
+                    "Message": "payment gateway timeout after 2000ms",
+                },
+                {
+                    "TimeGenerated": now.isoformat(),
+                    "Service": "checkout",
+                    "Level": "Error",
+                    "Message": "checkout request failed with status 502",
+                },
+            ]
+        )
+    )
+
+
+def demo_adapter_sources() -> AdapterSources:
+    """The three demo adapters as one selectable bundle.
+
+    The seeded picture is the same one ``demo_adapters`` reports:
+    checkout in the shop namespace, degraded. It claims nothing
+    about any real system.
+    """
+    return AdapterSources(
+        kubernetes=_demo_kubernetes_reader(),
+        datadog=_demo_datadog_adapter(),
+        azure=_demo_azure_adapter(),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Seeded demo: all three adapters, no live system needed
 # ---------------------------------------------------------------------------
 
@@ -704,63 +814,18 @@ def demo_adapters() -> AdaptersDemoReport:
     one still pending after several restarts — its Datadog error
     series is high, and its Azure log rows say why.
     """
-    now = datetime.now(UTC)
-    k8s = KubernetesReader(
-        InMemoryKubernetesBackend(
-            [
-                PodStatus(
-                    name="checkout-7d9f-a", namespace="shop", phase="Running",
-                    ready_containers=1, total_containers=1, restarts=2,
-                    service="checkout",
-                ),
-                PodStatus(
-                    name="checkout-7d9f-b", namespace="shop", phase="Running",
-                    ready_containers=1, total_containers=1, restarts=0,
-                    service="checkout",
-                ),
-                PodStatus(
-                    name="checkout-7d9f-c", namespace="shop", phase="Pending",
-                    ready_containers=0, total_containers=1, restarts=5,
-                    service="checkout",
-                ),
-                PodStatus(
-                    name="search-5c1-a", namespace="shop", phase="Running",
-                    ready_containers=1, total_containers=1, restarts=0,
-                    service="search",
-                ),
-            ]
-        )
-    )
-    datadog_backend = InMemoryDatadogBackend()
-    datadog_backend.add_series(
-        "http_request_errors_total",
-        {"service": "checkout", "namespace": "shop"},
-        [MetricSample(timestamp=now, value=162.0)],
-    )
-    azure = AzureAdapter(
-        InMemoryAzureBackend(
-            [
-                {
-                    "TimeGenerated": now.isoformat(),
-                    "Service": "checkout",
-                    "Level": "Error",
-                    "Message": "payment gateway timeout after 2000ms",
-                },
-                {
-                    "TimeGenerated": now.isoformat(),
-                    "Service": "checkout",
-                    "Level": "Error",
-                    "Message": "checkout request failed with status 502",
-                },
-            ]
-        )
-    )
+    sources = demo_adapter_sources()
+    assert sources.kubernetes is not None
+    assert sources.datadog is not None
+    assert sources.azure is not None
     return AdaptersDemoReport(
-        pods=k8s.list_pods(ListPodsRequest(namespace="shop", service="checkout")),
-        datadog=DatadogAdapter(datadog_backend).query_metrics(
+        pods=sources.kubernetes.list_pods(
+            ListPodsRequest(namespace="shop", service="checkout")
+        ),
+        datadog=sources.datadog.query_metrics(
             QueryMetricsRequest(query="sum:http_request_errors_total{service:checkout}")
         ),
-        azure=azure.query(
+        azure=sources.azure.query(
             KqlQueryRequest(
                 query="AppTraces | where Service == 'checkout' and Level == 'Error'"
             )
