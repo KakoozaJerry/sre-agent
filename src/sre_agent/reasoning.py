@@ -5,18 +5,58 @@ writes down what it thinks is wrong — and *why* it thinks so.
 
 How v1 works, honestly:
 
-- **No model call.** V1 is a small set of plain rules over the
-  three read-only tools, not a language model. That is on
-  purpose: anyone can run it with no API key, and the tests can
-  check every single diagnosis exactly, word for word. A model
-  backend can replace the ranking rules later, behind the same
-  report shape (the plan, Section 5, now says this).
+- **A backend reads the evidence, and the default is plain
+  rules.** The loop gathers evidence the same way no matter
+  what, then hands it to a diagnosis backend (see
+  ``model_backend.py``). The default backend is deterministic:
+  a small set of plain rules, no model call, no API key, so
+  the tests can check every diagnosis exactly, word for word.
+  An operator may instead hand the loop a language-model
+  backend built around their own model client — off by
+  default, enabled only by building it in code and passing it
+  in, with no client shipped in this repository. Whichever
+  backend runs, the report has the same shape and names the
+  backend, and the loop's own checks below apply to both: a
+  claim or cause citing evidence that is not on the incident
+  is refused, and a backend that returns no causes gets the
+  same "I don't know" escalation. The deterministic backend
+  reads counts, statuses and measured values only; the model
+  backend's reply is checked as untrusted input before any of
+  it can become a claim (``model_backend.py`` lists the rules).
 - **A fixed, bounded plan.** The loop runs at most four read-only
   queries, in a set order: service status, error logs, the error
   metric, then the request metric. Each query counts as one
   step against a step budget. The same query is never run
   twice in one diagnosis. If the budget runs out before the
   plan finishes, the loop stops gathering and escalates.
+- **Selected adapters are extra steps, never a new plan.**
+  An operator may select read adapters (Kubernetes, Datadog,
+  Azure Monitor — see ``adapters.py``) as extra evidence
+  sources. Each selected adapter is asked exactly one fixed
+  question, after the four core questions, and counts as one
+  more step. Adapter questions are built only from the
+  incident's target names, and only when a name is a plain
+  service or namespace name — a name carrying query syntax is
+  never built into a Datadog or KQL question, and that source
+  is skipped for that incident. Adapters are extras, so the
+  rules differ from the core plan in one way: if the step
+  budget runs out before an adapter step, that step is simply
+  skipped and the core diagnosis stands, and an adapter that
+  fails is skipped with the failure logged. Adapter answers
+  are read as counts and measured values only, exactly like
+  the core tools — raw adapter text never becomes a claim.
+- **Memory advice is attached last, and changes nothing.**
+  An operator may hand the loop a memory of past incidents
+  (``memory.py``). After the diagnosis above is decided — never
+  before, never as an input to it — the loop asks that memory
+  for its report on this incident and attaches it to the
+  incident and to this report: similar past incidents, each
+  runbook's record, and suggested runbooks, as advice only.
+  The advice proposes nothing and runs nothing; any suggested
+  fix still goes through the policy engine and a human
+  approval like any other. A memory that fails is skipped
+  with the failure logged, exactly like a failing adapter —
+  advice can never discard a diagnosis.
 - **Every claim cites evidence.** A claim or a hypothesis with
   no evidence behind it is refused by its own data model, and
   the loop checks again that every cited id is a real evidence
@@ -27,27 +67,47 @@ How v1 works, honestly:
   loop says so, sets no diagnosis, and moves the incident to
   "escalated" for a human. Guessing confidently is a bug here.
 - **Telemetry is data, never orders.** Log lines can say
-  anything, including attacks. Claims in the report are built
-  from counts, statuses and measured values only; raw log text
-  is never copied into a claim, and nothing in a report can
-  propose or run an action. Fixes come in a later phase,
-  through the policy engine and a human approval.
+  anything, including attacks. The default backend's claims
+  are built from counts, statuses and measured values only;
+  raw log text is never copied into a claim, and nothing in a
+  report can propose or run an action. Fixes come in a later
+  phase, through the policy engine and a human approval.
 """
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
+from .adapters import (
+    AdapterSources,
+    AzureQueryResult,
+    KqlQueryRequest,
+    KubernetesPodsResult,
+    ListPodsRequest,
+)
 from .logging_config import get_logger
-from .models import Evidence, Hypothesis, Incident, IncidentStatus, Target
+from .memory import IncidentMemory
+from .model_backend import (
+    BackendContext,
+    DeterministicBackend,
+    DiagnosisBackend,
+)
+from .models import (
+    DiagnosisClaim,
+    Evidence,
+    Hypothesis,
+    Incident,
+    IncidentStatus,
+    MemoryReport,
+    Target,
+)
 from .tools import (
     QueryMetricsRequest,
     QueryMetricsResult,
     SearchLogsRequest,
-    SearchLogsResult,
-    ServiceStatusResult,
     ToolLayer,
     demo_tool_layer,
 )
@@ -59,29 +119,17 @@ ERROR_METRIC = "http_request_errors_total"
 REQUEST_METRIC = "http_requests_total"
 DEFAULT_MAX_STEPS = 25
 
+# A name that may be built into a fixed adapter question: a plain
+# service name — letters, digits, dots, underscores, dashes — and
+# nothing else. A target name carrying spaces, quotes or query
+# syntax fails this check, and the Datadog and Azure steps are
+# skipped for that incident rather than built from it.
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
 
 class DiagnosisOutcome(str, Enum):
     DIAGNOSED = "diagnosed"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
-
-
-class DiagnosisClaim(BaseModel):
-    """One observed fact in a diagnosis, backed by evidence.
-
-    A claim without evidence is not a claim this project will
-    make, so the model itself refuses to build one.
-    """
-
-    statement: str
-    evidence_ids: list[str]
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-
-    @field_validator("evidence_ids")
-    @classmethod
-    def _claim_must_cite_evidence(cls, v: list[str]) -> list[str]:
-        if not v:
-            raise ValueError("a diagnosis claim must cite at least one evidence record")
-        return v
 
 
 class DiagnosisReport(BaseModel):
@@ -95,6 +143,15 @@ class DiagnosisReport(BaseModel):
     gathered_evidence: list[Evidence] = Field(default_factory=list)
     steps_used: int = 0
     queries_run: list[str] = Field(default_factory=list)
+    # Which backend produced the claims and causes above:
+    # "deterministic" (the default) or "language-model". The
+    # shape is the same either way; the name is recorded so a
+    # score can always be tied to the backend that earned it.
+    backend_name: str = "deterministic"
+    # Past-incident advice, attached after the diagnosis was
+    # decided when the loop was built with a memory. Advice
+    # only: it influenced no claim, cause or action above.
+    memory_report: MemoryReport | None = None
 
     def render_text(self) -> str:
         """Write the report as plain text a human can check.
@@ -107,6 +164,7 @@ class DiagnosisReport(BaseModel):
         lines = [
             f"Diagnosis for incident {self.incident_id}",
             f"Outcome: {self.outcome.value}",
+            f"Backend: {self.backend_name}",
             f"Summary: {self.summary}",
             f"Steps used: {self.steps_used}",
             "Claims (each one backed by the evidence named under it):",
@@ -126,17 +184,63 @@ class DiagnosisReport(BaseModel):
                     f"- {hyp.statement} (confidence {hyp.confidence:.2f}, "
                     f"supported by {len(hyp.supporting_evidence)} evidence record(s))"
                 )
+        if self.memory_report is not None:
+            report = self.memory_report
+            lines.append(
+                "Memory advice (advice only — it changed no claim, "
+                "cause or action):"
+            )
+            if not report.matches:
+                lines.append("- No similar past incident was found.")
+            for match in report.matches:
+                lines.append(
+                    f"- Past incident {match.incident_id} "
+                    f"[{match.status.value}] score {match.score}: "
+                    f"{match.title}"
+                )
+            if not report.suggestions:
+                lines.append(
+                    "- No runbook is suggested: no similar past "
+                    "incident ran one."
+                )
+            for suggestion in report.suggestions:
+                lines.append(
+                    f"- Suggested runbook {suggestion.runbook_id}: "
+                    f"{suggestion.reason}"
+                )
         return "\n".join(lines)
 
 
 class ReasoningLoop:
-    """The bounded, deterministic reasoning loop."""
+    """The bounded reasoning loop, over a pluggable backend.
 
-    def __init__(self, tools: ToolLayer, max_steps: int = DEFAULT_MAX_STEPS) -> None:
+    Gathering is the loop's; reading the gathered evidence is
+    the backend's. With no backend given, the deterministic
+    backend runs — the default, everywhere this loop is used.
+    """
+
+    def __init__(
+        self,
+        tools: ToolLayer,
+        max_steps: int = DEFAULT_MAX_STEPS,
+        adapters: AdapterSources | None = None,
+        memory: IncidentMemory | None = None,
+        backend: DiagnosisBackend | None = None,
+    ) -> None:
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
         self._tools = tools
         self._max_steps = max_steps
+        self._adapters = adapters
+        self._memory = memory
+        self._backend: DiagnosisBackend = (
+            backend if backend is not None else DeterministicBackend()
+        )
+
+    @property
+    def backend_name(self) -> str:
+        """The name of the backend this loop diagnoses with."""
+        return self._backend.name
 
     def diagnose(self, incident: Incident) -> DiagnosisReport:
         """Gather evidence for *incident* and write a diagnosis.
@@ -169,6 +273,21 @@ class ReasoningLoop:
                 return True
             if steps >= self._max_steps:
                 budget_exhausted = True
+                return False
+            seen_queries.add(key)
+            queries_run.append(key)
+            steps += 1
+            return True
+
+        def run_adapter_once(key: str) -> bool:
+            """Count one adapter step. False means: skip this
+            source — the budget is gone, but adapters are extras,
+            so skipping one never discards the core diagnosis the
+            way an unfinished core plan does."""
+            nonlocal steps
+            if key in seen_queries:
+                return True
+            if steps >= self._max_steps:
                 return False
             seen_queries.add(key)
             queries_run.append(key)
@@ -222,15 +341,120 @@ class ReasoningLoop:
             gathered.append(requests_ev)
             incident.add_evidence(requests_ev)
 
-        claims, hypotheses = self._reason(
-            incident=incident,
-            status_result=status_result,
-            status_ev=status_ev,
-            logs_result=logs_result,
-            logs_ev=logs_ev,
-            errors_result=errors_result,
-            errors_ev=errors_ev,
+        # Extra steps, only for adapters the operator selected.
+        # Each is one fixed question. A source that fails, or a
+        # target name that may not be built into its question,
+        # skips that source only — the diagnosis proceeds with
+        # whatever the other sources said.
+        adapters = self._adapters
+        pods_result: KubernetesPodsResult | None = None
+        pods_ev: Evidence | None = None
+        datadog_result: QueryMetricsResult | None = None
+        datadog_ev: Evidence | None = None
+        azure_result: AzureQueryResult | None = None
+        azure_ev: Evidence | None = None
+        if adapters is not None and not budget_exhausted:
+            if adapters.kubernetes is not None and run_adapter_once(
+                f"kubernetes pods: {target.namespace}/{target.service}"
+            ):
+                try:
+                    pods_result = adapters.kubernetes.list_pods(
+                        ListPodsRequest(
+                            namespace=target.namespace, service=target.service
+                        )
+                    )
+                    pods_ev = pods_result.to_evidence()
+                    gathered.append(pods_ev)
+                    incident.add_evidence(pods_ev)
+                except Exception:
+                    log.exception(
+                        "kubernetes adapter failed for incident %s; "
+                        "that source is skipped",
+                        incident.id,
+                    )
+                    pods_result = None
+                    pods_ev = None
+            if adapters.datadog is not None:
+                if not _SAFE_NAME_RE.match(target.service):
+                    log.warning(
+                        "datadog adapter skipped for incident %s: the "
+                        "service name is not a plain name",
+                        incident.id,
+                    )
+                elif run_adapter_once(f"datadog: {ERROR_METRIC}"):
+                    try:
+                        datadog_result = adapters.datadog.query_metrics(
+                            QueryMetricsRequest(
+                                query=(
+                                    f"sum:{ERROR_METRIC}"
+                                    f"{{service:{target.service}}}"
+                                )
+                            )
+                        )
+                        datadog_ev = datadog_result.to_evidence()
+                        gathered.append(datadog_ev)
+                        incident.add_evidence(datadog_ev)
+                    except Exception:
+                        log.exception(
+                            "datadog adapter failed for incident %s; "
+                            "that source is skipped",
+                            incident.id,
+                        )
+                        datadog_result = None
+                        datadog_ev = None
+            if adapters.azure is not None:
+                if not _SAFE_NAME_RE.match(target.service):
+                    log.warning(
+                        "azure adapter skipped for incident %s: the "
+                        "service name is not a plain name",
+                        incident.id,
+                    )
+                elif run_adapter_once("azure kql: error rows"):
+                    try:
+                        azure_result = adapters.azure.query(
+                            KqlQueryRequest(
+                                query=(
+                                    "AppTraces | where "
+                                    f"Service == '{target.service}' "
+                                    "and Level == 'Error'"
+                                )
+                            )
+                        )
+                        azure_ev = azure_result.to_evidence()
+                        gathered.append(azure_ev)
+                        incident.add_evidence(azure_ev)
+                    except Exception:
+                        log.exception(
+                            "azure adapter failed for incident %s; "
+                            "that source is skipped",
+                            incident.id,
+                        )
+                        azure_result = None
+                        azure_ev = None
+
+        claims, hypotheses = self._backend.reason(
+            BackendContext(
+                incident=incident,
+                evidence=list(gathered),
+                status_result=status_result,
+                status_ev=status_ev,
+                logs_result=logs_result,
+                logs_ev=logs_ev,
+                errors_result=errors_result,
+                errors_ev=errors_ev,
+                pods_result=pods_result,
+                pods_ev=pods_ev,
+                datadog_result=datadog_result,
+                datadog_ev=datadog_ev,
+                azure_result=azure_result,
+                azure_ev=azure_ev,
+            )
         )
+        # The same shaping for every backend: causes most
+        # likely first, at most three of them.
+        hypotheses = sorted(
+            hypotheses, key=lambda h: h.confidence, reverse=True
+        )[:3]
 
         # Final honesty check: nothing may cite evidence that is
         # not really on this incident.
@@ -272,6 +496,23 @@ class ReasoningLoop:
 
         incident.hypotheses.extend(hypotheses)
 
+        # Memory advice comes last, on purpose: the outcome,
+        # claims and causes above are already decided, so the
+        # advice cannot have influenced them, and a memory that
+        # fails is skipped rather than discarding the diagnosis.
+        memory_report: MemoryReport | None = None
+        if self._memory is not None:
+            try:
+                memory_report = self._memory.report(incident)
+                incident.memory_report = memory_report
+            except Exception:
+                log.exception(
+                    "memory failed for incident %s; its advice is "
+                    "skipped and the diagnosis stands",
+                    incident.id,
+                )
+                memory_report = None
+
         log.info(
             "diagnosed incident %s -> %s in %d step(s)",
             incident.id,
@@ -287,120 +528,9 @@ class ReasoningLoop:
             gathered_evidence=gathered,
             steps_used=steps,
             queries_run=queries_run,
+            backend_name=self._backend.name,
+            memory_report=memory_report,
         )
-
-    def _reason(
-        self,
-        *,
-        incident: Incident,
-        status_result: ServiceStatusResult | None,
-        status_ev: Evidence | None,
-        logs_result: SearchLogsResult | None,
-        logs_ev: Evidence | None,
-        errors_result: QueryMetricsResult | None,
-        errors_ev: Evidence | None,
-    ) -> tuple[list[DiagnosisClaim], list[Hypothesis]]:
-        """Apply the plain rules. Claims are facts; hypotheses are
-        possible causes. Both cite the evidence they came from."""
-        claims: list[DiagnosisClaim] = []
-        hypotheses: list[Hypothesis] = []
-        target = incident.target
-
-        if status_result is not None and status_ev is not None:
-            status = status_result.status
-            if status_result.found and status is not None and status.status in {
-                "degraded",
-                "down",
-            }:
-                claims.append(
-                    DiagnosisClaim(
-                        statement=(
-                            f"Service {target.service} is {status.status}: "
-                            f"{status.ready_replicas}/{status.desired_replicas} "
-                            "replicas ready"
-                        ),
-                        evidence_ids=[status_ev.id],
-                        confidence=0.9 if status.status == "down" else 0.8,
-                    )
-                )
-                if status.ready_replicas < status.desired_replicas:
-                    hypotheses.append(
-                        Hypothesis(
-                            statement=(
-                                f"Fewer copies of {target.service} are ready than "
-                                "wanted, so a copy may have failed or be stuck"
-                            ),
-                            supporting_evidence=[status_ev.id],
-                            confidence=0.65,
-                        )
-                    )
-
-        timeout_seen = False
-        if logs_result is not None and logs_ev is not None and logs_result.total_found > 0:
-            claims.append(
-                DiagnosisClaim(
-                    statement=(
-                        f"{logs_result.total_found} error log line(s) were found "
-                        f"for service {target.service}"
-                    ),
-                    evidence_ids=[logs_ev.id],
-                    confidence=0.85,
-                )
-            )
-            messages = " ".join(e.message.lower() for e in logs_result.entries)
-            timeout_seen = "timeout" in messages or "timed out" in messages
-            if timeout_seen:
-                hypotheses.append(
-                    Hypothesis(
-                        statement=(
-                            f"A call that {target.service} depends on is timing out"
-                        ),
-                        supporting_evidence=[logs_ev.id],
-                        confidence=0.75,
-                    )
-                )
-            else:
-                hypotheses.append(
-                    Hypothesis(
-                        statement=(
-                            f"{target.service} is failing on some requests; "
-                            "the error logs are the starting point"
-                        ),
-                        supporting_evidence=[logs_ev.id],
-                        confidence=0.6,
-                    )
-                )
-
-        errors_seen = False
-        if errors_result is not None and errors_ev is not None:
-            last_values = [
-                s.samples[-1].value for s in errors_result.series if s.samples
-            ]
-            if last_values and max(last_values) > 0:
-                errors_seen = True
-                claims.append(
-                    DiagnosisClaim(
-                        statement=(
-                            f"The error metric {ERROR_METRIC} is not zero: "
-                            f"latest value {max(last_values):g}"
-                        ),
-                        evidence_ids=[errors_ev.id],
-                        confidence=0.85,
-                    )
-                )
-
-        # Strengthen the timeout hypothesis when the error metric
-        # agrees with the error logs: two independent sources.
-        if timeout_seen and errors_seen and errors_ev is not None:
-            for hyp in hypotheses:
-                if "timing out" in hyp.statement:
-                    if errors_ev.id not in hyp.supporting_evidence:
-                        hyp.supporting_evidence.append(errors_ev.id)
-                    hyp.confidence = 0.85
-
-        hypotheses.sort(key=lambda h: h.confidence, reverse=True)
-        return claims, hypotheses[:3]
-
 
 def demo_diagnosis() -> DiagnosisReport:
     """Run the loop once on the seeded demo data, with no setup.
