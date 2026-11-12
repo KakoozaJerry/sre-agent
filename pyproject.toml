@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sre-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "An autonomous SRE agent that diagnoses and helps remediate incidents under human-approved guardrails."
 readme = "README.md"
 license = { text = "MIT" }
