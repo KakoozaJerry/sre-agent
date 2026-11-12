@@ -28,12 +28,16 @@ How it works, honestly:
 - The CLI uses only the Python standard library to talk to the
   server, so installing the CLI never needs the server extras.
 - ``diagnose`` runs the reasoning loop once, locally, on the
-  seeded demo data and prints the report. Diagnosing a live
-  server incident from the CLI is not possible yet: the server
-  does not run the reasoning loop, so an incident record only
-  carries a diagnosis if one was set on it in its own process.
-  ``show`` prints whatever diagnosis the record holds, or says
-  there is none yet.
+  seeded demo data and prints the report. Since Phase 7 the
+  server runs the same loop itself when it is built with a tool
+  layer — the shipped server app uses the demo tool layer — so a
+  live incident diagnosed by its server carries that diagnosis
+  on its record, and ``show`` prints it, with its causes and
+  evidence. When the server was built with a memory of past
+  incidents, the incident also carries that memory's advice,
+  and ``show`` prints it too, labelled advice only. A server
+  built with no tool layer records incidents only; ``show``
+  then says there is no diagnosis yet.
 
 ``approve-demo`` is the first command that changes anything, and
 it changes demo state only, through the whole Tier 2 path: a fix
@@ -43,8 +47,11 @@ the terminal approves that exact action — typed at the prompt, or
 with ``--yes`` — under their name (``--by``). Policy is checked
 again at approval time, the approval expires in 15 minutes and
 can be used once, and every decision lands in an audit log for
-the run (see approvals.py). Approving a live server incident is
-not wired yet: the server holds no runbook state.
+the run (see approvals.py). Since Phase 7 the server serves
+the same approval flow for its own incidents over HTTP (see
+server.py and the operator guide); this CLI command stays the
+in-process demo, and there is no CLI command for the server's
+approvals yet.
 
 ``postmortem-demo`` runs one seeded demo incident through the
 whole path — diagnosis, a Tier 2 approved restart, resolution —
@@ -321,6 +328,30 @@ def format_incident_detail(incident: dict[str, Any]) -> str:
             lines.append(
                 f"- {hyp.get('statement', '')} "
                 f"(confidence {float(hyp.get('confidence', 0.0)):.2f})"
+            )
+    memory_report = incident.get("memory_report")
+    if memory_report:
+        lines.append(
+            "Memory advice (advice only — nothing here runs or approves a fix):"
+        )
+        matches = memory_report.get("matches") or []
+        if not matches:
+            lines.append("- No similar past incident was found.")
+        for match in matches:
+            lines.append(
+                f"- Past incident {match.get('incident_id', '?')} "
+                f"[{match.get('status', '?')}] score {match.get('score', 0)}: "
+                f"{match.get('title', '')}"
+            )
+        suggestions = memory_report.get("suggestions") or []
+        if not suggestions:
+            lines.append(
+                "- No runbook is suggested: no similar past incident ran one."
+            )
+        for suggestion in suggestions:
+            lines.append(
+                f"- Suggested runbook {suggestion.get('runbook_id', '?')}: "
+                f"{suggestion.get('reason', '')}"
             )
     evidence = incident.get("evidence") or []
     lines.append(f"Evidence ({len(evidence)} record(s)):")
