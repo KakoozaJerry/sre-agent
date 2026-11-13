@@ -1,26 +1,25 @@
-"""The operator and runbook authoring guides: present and honest.
+"""The documents: present, linked, and pinned by facts.
 
-Phase 5's docs item is only done if the guides exist, the README
-links them, and they say the plain things an operator or a
-runbook author must not be misled about: the server must stay
-local until the security findings are fixed, a server-side run
-does not by itself mark an incident resolved, and there is no
-``sre-agent halt`` command in this build. These tests pin those
-sentences so a later edit cannot quietly drop them.
+Phase 11's doc-map item calmed these tests down on purpose.
+They pin facts, not sentences: a document exists, the README
+links it, the version agrees in the places it lives, the
+release scores are the numbers in the release record, and a
+small set of named safety facts is present (checked on
+whitespace-flattened text, so re-wrapping or rewording a
+paragraph does not break a test). A later edit can improve
+the wording freely; it cannot quietly drop a fact, a link,
+a version, or a score.
 
-The v0.1.0 release is pinned here too: the walkthrough must
-exist, say what was measured and what was not run, and the
-version must agree in the three places it lives — the package,
-the project file, and the recorded regression baseline — so a
-release can never be half-bumped.
-
-The v0.2.0 release adds its own pins: a changelog carrying both
-releases with the improved-not-closed findings stated, a
-v0.2.0 walkthrough, and the community basics — a contributing
-guide that names the real checks and the rules that do not
-bend, a code of conduct, the two issue templates and the pull
-request template — all linked from the README, so a later edit
-cannot quietly drop the way in for a new contributor.
+The facts pinned here include: the guides exist and name the
+real commands and limits (a token-less server has no
+authentication, a server-side run does not by itself mark an
+incident resolved, and there is no ``sre-agent halt`` command
+in this build); the released walkthroughs exist as frozen
+release artefacts carrying their release-day scores; the
+changelog carries both releases with the improved-not-closed
+findings stated; and the community basics — contributing
+guide, code of conduct, issue templates, pull request
+template — exist and are linked from the README.
 """
 
 from __future__ import annotations
@@ -40,6 +39,11 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _flat(text: str) -> str:
+    """One line, single spaces: wording may move, facts may not."""
+    return " ".join(text.split())
+
+
 def test_operator_guide_exists_and_covers_the_day_to_day() -> None:
     text = _read(DOCS / "operator-guide.md")
     for needle in (
@@ -53,17 +57,16 @@ def test_operator_guide_exists_and_covers_the_day_to_day() -> None:
 
 
 def test_operator_guide_states_the_hard_limits_plainly() -> None:
-    text = _read(DOCS / "operator-guide.md")
-    # F-01/F-02: the server stays on one operator's own machine.
-    assert "no authentication" in text
-    # A record-only server shows no diagnosis; the guide says why.
-    assert "Diagnosis: none yet" in text
-    # Live approvals are served by the server, and a run does not
-    # claim the incident is resolved.
-    assert "Approve a fix on the server" in text
-    assert "does **not** mark the incident" in text
-    # There is no halt command in this build; the guide must say so.
-    assert "no\n  `sre-agent halt` command" in text or "no `sre-agent halt` command" in text
+    flat = _flat(_read(DOCS / "operator-guide.md"))
+    # Facts, not sentences: a token-less server has no
+    # authentication (F-01); a record-only server shows no
+    # diagnosis; a server-side run does not mark an incident
+    # resolved; and there is no halt command in this build.
+    assert "no authentication" in flat
+    assert "Diagnosis: none yet" in flat
+    assert "Approve a fix on the server" in flat
+    assert "not** mark the incident resolved" in flat
+    assert "no `sre-agent halt` command" in flat
 
 
 def test_runbook_guide_exists_and_names_the_four_places() -> None:
@@ -81,10 +84,10 @@ def test_runbook_guide_exists_and_names_the_four_places() -> None:
 
 
 def test_runbook_guide_keeps_the_never_rules() -> None:
-    text = _read(DOCS / "runbook-authoring-guide.md")
-    assert "a runbook is never a\ncommand" in text or "never a command" in text
-    assert "Tier 3" in text
-    assert "replicas_affected" in text
+    flat = _flat(_read(DOCS / "runbook-authoring-guide.md"))
+    assert "never a command" in flat
+    assert "Tier 3" in flat
+    assert "replicas_affected" in flat
 
 
 def test_readme_links_both_guides() -> None:
@@ -95,22 +98,29 @@ def test_readme_links_both_guides() -> None:
 
 def test_release_walkthrough_exists_and_covers_the_scenario() -> None:
     text = _read(DOCS / "v0.1.0-walkthrough.md")
+    flat = _flat(text)
     for needle in (
         "sre-agent evaluate",
         "sre-agent regression-check",
         "sre-agent approve-demo --by",
         "pod kill",
         "0 unsafe actions",
+        # Release-day score facts for this frozen artefact.
+        "242 tests pass",
+        "5 of 5",
+        "8 of 8",
+        "7 of 7",
+        "10 of 10",
     ):
-        assert needle in text
+        assert needle in flat
 
 
 def test_release_walkthrough_states_what_was_not_run() -> None:
-    text = _read(DOCS / "v0.1.0-walkthrough.md")
-    # The Compose walkthrough was not run in the release
+    flat = _flat(_read(DOCS / "v0.1.0-walkthrough.md"))
+    # Facts: the Compose walkthrough was not run in the release
     # environment, and the server limits ship with the release.
-    assert "not** run in the release" in text
-    assert "no authentication" in text
+    assert "not** run in the release" in flat
+    assert "no authentication" in flat
 
 
 def test_version_agrees_in_package_project_file_and_baseline() -> None:
@@ -132,21 +142,21 @@ def test_readme_links_the_release_walkthrough() -> None:
 
 
 def test_operator_guide_states_memory_is_advice_only() -> None:
-    text = _read(DOCS / "operator-guide.md")
-    # Phase 7: memory advice is attached to a live diagnosis,
-    # after it is decided; the guide must keep that boundary.
-    assert "Memory advice (advice only" in text
-    assert "it changes no claim or cause, it creates no proposal" in text
+    flat = _flat(_read(DOCS / "operator-guide.md"))
+    # Phase 7 fact: memory advice is attached to a live
+    # diagnosis, after it is decided, and changes nothing.
+    assert "Memory advice (advice only" in flat
+    assert "after the diagnosis is decided" in flat
+    assert "creates no proposal" in flat
 
 
 def test_operator_guide_states_the_database_store_honestly() -> None:
-    text = _read(DOCS / "operator-guide.md")
-    # Phase 7: a database store now exists, and the shipped app
-    # still uses the in-memory one; the guide must say both, and
-    # must no longer say there is no database.
-    assert "SQLiteIncidentStore" in text
-    assert "shipped server app still uses the in-memory store" in text
-    assert "there is no database yet" not in text
+    flat = _flat(_read(DOCS / "operator-guide.md"))
+    # Phase 7 facts: a database store exists, and the shipped
+    # app still uses the in-memory one.
+    assert "SQLiteIncidentStore" in flat
+    assert "in-memory store" in flat
+    assert "there is no database yet" not in flat
 
 
 def test_quickstart_script_is_the_one_command_install() -> None:
@@ -205,12 +215,14 @@ def test_readme_walkthrough_covers_the_live_path_end_to_end() -> None:
 
 def test_readme_walkthrough_states_the_honest_limits() -> None:
     readme = _read(REPO_ROOT / "README.md")
-    # The walkthrough runs on seeded demo data, an approved run
-    # lands on mitigating (never straight to resolved), and the
-    # shipped server's incidents are in memory only.
-    assert "seeded demo data" in readme
+    flat = _flat(readme)
+    # Facts: the walkthrough runs on seeded demo data, an
+    # approved run lands on mitigating (never straight to
+    # resolved), and the shipped server's incidents are in
+    # memory only.
+    assert "seeded demo data" in flat
     assert '"incident_status": "mitigating"' in readme
-    assert "keeps its\nincidents in memory" in readme or "keeps its incidents in memory" in readme
+    assert "keeps its incidents in memory" in flat
     guide = _read(DOCS / "operator-guide.md")
     assert "Walkthrough: one alert" in guide
 
@@ -234,19 +246,24 @@ def test_changelog_carries_both_releases_honestly() -> None:
 
 def test_v020_walkthrough_exists_and_states_its_limits() -> None:
     text = _read(DOCS / "v0.2.0-walkthrough.md")
+    flat = _flat(text)
     for needle in (
         "sre-agent evaluate",
         "sre-agent regression-check",
         "0 unsafe actions",
         "Walkthrough: one alert, end to end",
     ):
-        assert needle in text
-    # The limits that ship with this release are stated in it:
-    # the human GitHub Release step, the token-less server, and
-    # the shipped app's in-memory store.
-    assert "no tool for creating a GitHub Release" in text
-    assert "no authentication" in text
-    assert "in-memory store" in text
+        assert needle in flat
+    # Facts that ship with this release: the human GitHub
+    # Release step, the token-less server, and the shipped
+    # app's in-memory store.
+    assert "no tool for creating a GitHub Release" in flat
+    assert "no authentication" in flat
+    assert "in-memory store" in flat
+    # Release-day score facts for this frozen artefact.
+    assert "358 tests pass" in flat
+    assert "5 of 5" in flat
+    assert "8 of 8" in flat
 
 
 def test_contributing_guide_names_the_real_checks() -> None:
@@ -369,3 +386,96 @@ def test_readme_opening_carries_the_positioning() -> None:
         "every release ships its scores",
     ):
         assert needle in above
+
+
+def test_readme_carries_the_badges() -> None:
+    readme = _read(REPO_ROOT / "README.md")
+    # Phase 11: four badges sit at the top of the README -- CI
+    # status from the repo's own workflow file, the latest
+    # release and the licence read from the repository itself
+    # by shields.io, and the Python floor (3.11) the project
+    # file declares in requires-python.
+    above = readme.split("## In plain English", 1)[0]
+    for needle in (
+        "actions/workflows/ci.yml/badge.svg",
+        "img.shields.io/github/v/release/KakoozaJerry/sre-agent",
+        "img.shields.io/github/license/KakoozaJerry/sre-agent",
+        "img.shields.io/badge/python-3.11",
+    ):
+        assert needle in above
+
+
+def test_security_policy_covers_reporting_versions_and_scope() -> None:
+    text = _read(REPO_ROOT / "SECURITY.md")
+    flat = _flat(text)
+    # Phase 11: SECURITY.md must say how to report privately
+    # (the same path CONTRIBUTING already gave, with no
+    # invented email address), which versions are supported,
+    # and what is in and out of scope.
+    for needle in (
+        "do not open a public issue",
+        "Abraham Kakooza",
+        "no separate security email address",
+        "0.2.0 (latest release)",
+        "What is in scope",
+        "What is out of scope",
+        "docs/security-review.md",
+        "docs/hosted-demo.md",
+    ):
+        assert needle in flat
+    assert __version__ in text
+
+
+def test_hosted_demo_guide_explains_the_public_token() -> None:
+    text = _read(DOCS / "hosted-demo.md")
+    flat = _flat(text)
+    # Phase 11: the hosted-demo token rationale belongs in the
+    # hosted-demo guide itself: public by design because the
+    # demo is read-mostly, Tier-3-only, capped, and holds no
+    # real data.
+    for needle in (
+        "Why the hosted demo's token is public",
+        "sre-agent-demo-visitor",
+        "read-mostly",
+        "Tier-3-only",
+        "Capped",
+        "No real data",
+    ):
+        assert needle in flat
+    readme = _read(REPO_ROOT / "README.md")
+    assert "SECURITY.md" in readme
+    contributing = _read(REPO_ROOT / "CONTRIBUTING.md")
+    assert "SECURITY.md" in contributing
+
+
+def test_readme_documents_section_is_a_doc_map() -> None:
+    readme = _read(REPO_ROOT / "README.md")
+    documents = readme.split("## Documents", 1)[1].split("## Quick start", 1)[0]
+    flat = _flat(documents)
+    # Phase 11 doc map: each core document is named with the
+    # one job it does, in the map's own words.
+    for needle in (
+        "Pitch and start",
+        "docs/operator-guide.md",
+        "Run it",
+        "docs/evaluation.md",
+        "Scores",
+        "docs/security-review.md",
+        "Safety",
+        "docs/progress.md",
+        "Archive",
+    ):
+        assert needle in flat
+
+
+def test_released_walkthroughs_are_frozen_artefacts() -> None:
+    readme = _read(REPO_ROOT / "README.md")
+    flat = _flat(readme)
+    # Phase 11: the README's doc map states that the released
+    # walkthroughs are frozen, and where current numbers live
+    # instead. The walkthroughs themselves keep their own
+    # release-day facts (pinned above), unchanged by later work.
+    assert "Released walkthroughs are frozen release artefacts" in flat
+    assert "not updated for later work" in flat
+    assert "docs/v0.1.0-walkthrough.md" in readme
+    assert "docs/v0.2.0-walkthrough.md" in readme

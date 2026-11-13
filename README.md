@@ -1,5 +1,7 @@
 # sre-agent
 
+[![CI](https://github.com/KakoozaJerry/sre-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/KakoozaJerry/sre-agent/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/KakoozaJerry/sre-agent)](https://github.com/KakoozaJerry/sre-agent/releases) [![Licence: MIT](https://img.shields.io/github/license/KakoozaJerry/sre-agent)](LICENSE) [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+
 **The SRE agent you can audit.**
 
 No API key, and no model required: every claim cites its evidence, and every release ships its scores.
@@ -66,6 +68,26 @@ Being straight about this matters more than hype:
 
 ## Documents
 
+Start with the map, then use the full list below it. Each
+document has one job, so a reader does not have to guess
+where a fact lives.
+
+| You want to | Read | Its job |
+|---|---|---|
+| Get the pitch and start | This README | Pitch and start: what it is, the quickstart, and one alert end to end |
+| Run it day to day | [docs/operator-guide.md](docs/operator-guide.md) | Run it: install, server, approvals, stopping it, troubleshooting |
+| See the scores | [docs/evaluation.md](docs/evaluation.md) | Scores: the scenarios, the per-backend scores, and what is not scored |
+| Check the safety case | [docs/security-review.md](docs/security-review.md) | Safety: what was attacked, what held, and the findings that remain |
+| Follow what changed | [docs/progress.md](docs/progress.md) | Archive: the pass-by-pass plain-English history of the build |
+
+Released walkthroughs are frozen release artefacts:
+[docs/v0.1.0-walkthrough.md](docs/v0.1.0-walkthrough.md) and
+[docs/v0.2.0-walkthrough.md](docs/v0.2.0-walkthrough.md) record
+what was measured on their release day and are not updated
+for later work. Current numbers live in
+[docs/evaluation.md](docs/evaluation.md) and
+[docs/progress.md](docs/progress.md).
+
 - [White paper (PDF)](docs/whitepaper.pdf) — "The SRE agent you can audit": the design, the safety model, the evaluation results and the honest limits, in one document.
 - [PLAN.md](PLAN.md) — the full plan: vision, architecture, safety model, roadmap, and the long-term open-core path.
 - [docs/v0.1.0-walkthrough.md](docs/v0.1.0-walkthrough.md) — the v0.1.0 release notes and demo scenario walkthrough: what shipped, the scores measured on release day, and a step-by-step run through the scored scenario.
@@ -73,6 +95,7 @@ Being straight about this matters more than hype:
 - [CHANGELOG.md](CHANGELOG.md) — every notable change, release by release, in plain words.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to help: setup, the checks every change must pass, and the safety rules that do not bend.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — how we treat each other in this project's spaces.
+- [SECURITY.md](SECURITY.md) — how to report a security problem privately, which versions are supported, and what is in and out of scope.
 - [docs/security-review.md](docs/security-review.md) — the security review and red-team report on the agent itself: what was attacked, what held, and the findings that remain.
 - [docs/operator-guide.md](docs/operator-guide.md) — running the agent day to day: install, server, CLI, approvals, stopping it, and the checks to run after any change.
 - [docs/runbook-authoring-guide.md](docs/runbook-authoring-guide.md) — writing a new runbook: the four places that must agree, honest blast-radius counting, and the tests it must have.
@@ -116,6 +139,27 @@ sre-agent evaluate
 
 For development (the test tools as well), install
 `pip install -e ".[dev,server]"` instead and run `pytest`.
+
+### Installing as a user, not a contributor
+
+The quickstart above is the contributor path: it installs
+from a clone of this repository. The user install path,
+once the package is published to PyPI, will be:
+
+```bash
+pipx install sre-agent
+```
+
+`sre-agent` is not on PyPI yet, so that command does not
+work today — do not use it until a release announces the
+PyPI publication. Until then, the quickstart from source
+above is the only install path, and the hosted demo needs
+no install at all. The package metadata in
+`pyproject.toml` (project URLs, keywords and classifiers)
+is ready for that publication; publishing itself, and
+publishing the demo image to GHCR, are release steps that
+need the maintainer's PyPI and GitHub settings, in the
+same way creating a GitHub Release does.
 
 ## Walkthrough: one alert, end to end
 

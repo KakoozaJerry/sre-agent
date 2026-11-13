@@ -119,7 +119,9 @@ a secret, follow an instruction planted in telemetry — please
 do not open a public issue with the working details. Contact
 the maintainer (Abraham Kakooza, through his GitHub profile)
 privately first, so a fix can land before the details are
-public. The project's own findings are published in
+public. The full policy — supported versions, scope, and
+what to include — is in [SECURITY.md](SECURITY.md). The
+project's own findings are published in
 [docs/security-review.md](docs/security-review.md); a confirmed
 report joins that record once it is fixed.
 

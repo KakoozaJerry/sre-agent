@@ -10,6 +10,27 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [{ name = "Abraham Kakooza" }]
+keywords = [
+    "sre",
+    "ai-agent",
+    "incident-response",
+    "observability",
+    "devops",
+    "site-reliability-engineering",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Systems Administration",
+]
 dependencies = [
     "pydantic>=2.6",
     "fastapi>=0.110",
@@ -27,6 +48,13 @@ server = [
     "uvicorn>=0.29",
     "httpx>=0.27",
 ]
+
+[project.urls]
+Homepage = "https://github.com/KakoozaJerry/sre-agent"
+Repository = "https://github.com/KakoozaJerry/sre-agent"
+Documentation = "https://github.com/KakoozaJerry/sre-agent#readme"
+Issues = "https://github.com/KakoozaJerry/sre-agent/issues"
+Changelog = "https://github.com/KakoozaJerry/sre-agent/blob/main/CHANGELOG.md"
 
 [project.scripts]
 sre-agent = "sre_agent.cli:main"

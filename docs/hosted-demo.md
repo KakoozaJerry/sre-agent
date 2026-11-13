@@ -131,6 +131,37 @@ is `sre-agent-demo-visitor`, sent in the
 `X-SRE-Agent-Token` header — public on purpose, for the
 reasons this page gives.
 
+## Why the hosted demo's token is public
+
+The visitor token (`sre-agent-demo-visitor`) is printed in
+the README and in this guide, on purpose. A shared token
+that everyone knows is not a secret, and this section says
+plainly why that is acceptable here — and only here:
+
+- **It is read-mostly.** The token's main job is letting a
+  visitor read the seeded incidents and diagnoses. It is a
+  gate against a completely open server, not a password
+  protecting anything private: there is nothing private
+  behind it.
+- **No real data.** Every incident, number, workload and
+  past incident behind the token is seeded demo data,
+  made up for the demo. Nothing real can leak, because
+  nothing real is there.
+- **Tier-3-only.** The only action that can run behind the
+  token is the Tier 3 demo grant — restart and scale in
+  the `shop` namespace only, at most three replicas — and
+  it runs against seeded demo workloads. Rollback can
+  never run here, because hosted mode has no approval path
+  at all.
+- **Capped.** The ingestion caps stay on: a visitor can
+  open only so many pretend incidents, of only so large a
+  size, before the server refuses.
+
+That reasoning belongs to this demo only. A server holding
+real incidents needs a real, private token — the local
+server's rule, stated in the operator guide, is that a
+token you set is a secret you keep.
+
 ## What the hosted demo cannot do — honestly
 
 - It cannot touch anything real. Every number, workload and
