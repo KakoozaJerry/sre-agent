@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/KakoozaJerry/sre-agent/blob/main/CONTRIBUTING.md
+    about: How to set up, run the checks, and propose a change
+  - name: Security review
+    url: https://github.com/KakoozaJerry/sre-agent/blob/main/docs/security-review.md
+    about: The project's own findings — please read CONTRIBUTING.md before reporting a security problem publicly
