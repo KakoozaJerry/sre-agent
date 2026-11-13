@@ -2,6 +2,16 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 11 continues) — the social preview is set, verified on the repository
+
+- **Phase 11's badges and social-preview item is done.** The four badges were already at the top of the README. The other half — the picture shown when someone shares the repository link — is now verified as set: the public repository page's social image (`og:image`) was downloaded in this pass and compared with the card prepared here, and they are the same file, byte for byte (1280×640, 49,647 bytes, same MD5 hash). It is set, not just prepared.
+- **How it was checked matters.** Earlier passes said the preview could not be read back through the GitHub connection used to build this project — and that is still true of that connection. But the public page itself carries the preview as its social image, so checking that is a real read-back, the same standard used for the description and Topics. The lesson is written into the plan: "the connection cannot read it back" is not "it cannot be read back".
+- **CI is green twice in a row.** Runs #181 and #182 both passed all eight jobs. Run #180, recorded here for plainness, showed as failed only because three macOS jobs were cancelled before running — no test failed in it, the same pattern as run #179.
+- **The last open Phase 11 item was re-checked, not assumed.** All five candidate package names from the last pass are still free on PyPI, and there is still no public demo image on GHCR (its package page still returns 404). So distribution stays open, waiting first on Abraham choosing the new package name.
+- Everything checked here holds: all 432 tests pass, the style and type checks are clean, and every scored check is unchanged — scenarios 5 of 5, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions. The hosted demo was checked from outside and is healthy.
+- Still open in Phase 11: only real distribution — choosing the PyPI name, then publishing to PyPI and the demo image to GHCR.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 13 November 2026 (Phase 11 continues) — the PyPI name is already taken
 
 - **The name this project planned to publish under belongs to someone else.** Reading PyPI itself — the registry the distribution plan always pointed at, never actually read until now — shows `sre-agent` is a different SRE agent, published by Fuzzy Labs, at versions 0.1.0 (November 2025), 0.2.0 and 0.2.1 (March 2026). This project cannot publish a package under that name.
