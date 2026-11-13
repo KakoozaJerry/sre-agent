@@ -2,6 +2,18 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 11 continues) — the package is renamed to the chosen name, sreagent
+
+- **The rename Abraham chose is done.** The package in `pyproject.toml` is now called `sreagent` — the name he picked on 13 November 2026 from the names checked free on PyPI, after `sre-agent` turned out to belong to another project (Fuzzy Labs). The version did not change: it is still 0.2.0.
+- **Only one of the project's three names changed — and that is the point.** A Python project has a distribution name (what you type in `pipx install sreagent`), an import name (what code imports, `sre_agent`), and a command name (what you run, `sre-agent`). Only the first one had to change, so every command, import and quickstart step a reader already knows stayed true.
+- **The split was proven in a built package, not just written down.** A wheel built in this pass is named `sreagent-0.2.0`, its record inside says `Name: sreagent`, its command entry is still `sre-agent`, its top-level package is still `sre_agent`, and `sre-agent --version` still prints `sre-agent 0.2.0`.
+- **The README now says all of this in its user-install section.** It names `sreagent` as the chosen name and `pipx install sreagent` as the future user install, keeps the warning that `pipx install sre-agent` installs the other agent, and says plainly that this project is not published yet — so the new command does not work today either. Two new tests pin the new name and the unchanged command/import names; the older tests were re-pinned to the new words.
+- **The name was re-checked before the rename was claimed.** PyPI still returns 404 for `sreagent` in this pass (free, not yet published), the hosted demo is healthy from outside, and there is still no public demo image on GHCR (404).
+- Everything checked here holds: all 434 tests pass (up from 432), the style and type checks are clean, and every scored check is unchanged — scenarios 5 of 5, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions.
+- Still open in Phase 11: only real distribution itself — setting up PyPI trusted publishing and publishing the package, and publishing the demo image to GHCR. Both need Abraham's maintainer steps and a workflow file.
+- One piece of bookkeeping, stated plainly: the repository copy of the plan did not carry the sentence recording Abraham's name decision, which the goal copy had. The two copies are made identical again in this pass.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 13 November 2026 (Phase 11 continues) — the social preview is set, verified on the repository
 
 - **Phase 11's badges and social-preview item is done.** The four badges were already at the top of the README. The other half — the picture shown when someone shares the repository link — is now verified as set: the public repository page's social image (`og:image`) was downloaded in this pass and compared with the card prepared here, and they are the same file, byte for byte (1280×640, 49,647 bytes, same MD5 hash). It is set, not just prepared.

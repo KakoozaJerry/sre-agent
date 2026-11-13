@@ -150,7 +150,7 @@ For development (the test tools as well), install
 
 The quickstart above is the contributor path: it installs
 from a clone of this repository. There is no install of
-this project from PyPI yet — and one warning matters here:
+this project from PyPI yet — and two names matter here:
 
 **Do not run `pipx install sre-agent` expecting this
 project.** The name `sre-agent` on PyPI already belongs to
@@ -159,13 +159,20 @@ PyPI on 13 November 2026: versions 0.1.0 to 0.2.1). That
 command works today — and installs their agent, not this
 one.
 
-This project cannot publish under that name. A new PyPI
-name must be chosen first; until a release announces the
-chosen name and its publication, the quickstart from
-source above is the only install path, and the hosted
-demo needs no install at all. The package metadata in
-`pyproject.toml` (project URLs, keywords and classifiers)
-is ready for that publication; publishing itself, and
+**This project's chosen PyPI name is `sreagent`.** It was
+checked free on PyPI on 13 November 2026, and the package
+in `pyproject.toml` now carries that name. When this
+project is published, the user install will be
+`pipx install sreagent` — and the command it installs is
+still called `sre-agent`, because the distribution name,
+the import package (`sre_agent`) and the command name are
+three different things, and only the first one changed.
+
+That publication has not happened yet, so
+`pipx install sreagent` does not work today either.
+Until a release announces the publication, the quickstart
+from source above is the only install path, and the hosted
+demo needs no install at all. Publishing to PyPI, and
 publishing the demo image to GHCR, are release steps that
 need the maintainer's PyPI and GitHub settings, in the
 same way creating a GitHub Release does.

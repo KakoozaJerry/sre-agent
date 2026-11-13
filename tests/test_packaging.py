@@ -3,8 +3,10 @@
 The metadata in ``pyproject.toml`` is what PyPI will show
 when the package is published. These tests pin the facts —
 URLs, keywords, classifiers — so a later edit cannot drop
-them quietly, and pin the README's honest warning that the
-PyPI name sre-agent already belongs to a different project.
+them quietly, pin the distribution name Abraham chose
+(``sreagent``, 2026-11-13), and pin the README's honest
+warning that the PyPI name sre-agent already belongs to a
+different project.
 """
 
 from __future__ import annotations
@@ -50,7 +52,20 @@ def test_requires_python_matches_the_classifier_floor() -> None:
     assert project["requires-python"] == ">=3.11"
 
 
-def test_readme_warns_that_the_pypi_name_is_taken() -> None:
+def test_distribution_name_is_the_chosen_sreagent() -> None:
+    # Abraham chose ``sreagent`` on 2026-11-13, after ``sre-agent``
+    # was read back on PyPI as a different project (Fuzzy Labs).
+    # ``sreagent`` was checked free on PyPI that day (404).
+    assert _project()["name"] == "sreagent"
+
+
+def test_command_and_import_names_are_unchanged_by_the_rename() -> None:
+    # Three different names: the distribution name changed, the
+    # import package and the command a user runs did not.
+    assert _project()["scripts"] == {"sre-agent": "sre_agent.cli:main"}
+
+
+def test_readme_names_the_chosen_name_and_warns_about_the_taken_one() -> None:
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     flat = " ".join(readme.split())
     # Phase 11, corrected 2026-11-13: the PyPI name sre-agent
@@ -62,6 +77,12 @@ def test_readme_warns_that_the_pypi_name_is_taken() -> None:
     assert "Do not run `pipx install sre-agent` expecting this project" in flat
     assert "already belongs to a different SRE agent" in flat
     assert "Fuzzy Labs" in flat
+    # The chosen name, and the future user install under it,
+    # with the command name stated as unchanged.
+    assert "chosen PyPI name is `sreagent`" in flat
+    assert "`pipx install sreagent`" in flat
+    assert "still called `sre-agent`" in flat
+    # Not published under either name yet.
     assert "no install of this project from PyPI yet" in flat
     assert "not on PyPI yet" not in flat
     # The contributor quickstart stays the install path today.
