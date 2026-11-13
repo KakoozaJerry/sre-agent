@@ -337,6 +337,23 @@ def test_readme_status_is_short_and_complete() -> None:
         assert needle in status
 
 
+def test_evaluation_page_scores_block_is_generated_and_current() -> None:
+    text = _read(DOCS / "evaluation.md")
+    # Phase 11: the score/test-count block is generated from
+    # the release record (baseline + release walkthrough),
+    # not written by hand, and a docs test pins it here so a
+    # release that moves the record without regenerating the
+    # page fails. The stale v0.1.0 figures must stay gone.
+    from sre_agent.evaluation_page import load_release_scores, render_scores_block
+
+    assert render_scores_block(load_release_scores(REPO_ROOT)) in text
+    assert "242 tests" not in text
+    assert "Current measured result (2026-11-09)" not in text
+    scores = load_release_scores(REPO_ROOT)
+    assert f"{scores.test_count} tests pass" in text
+    assert scores.version == __version__
+
+
 def test_readme_opening_carries_the_positioning() -> None:
     readme = _read(REPO_ROOT / "README.md")
     # Phase 11 positioning: the wedge is auditability, stated in

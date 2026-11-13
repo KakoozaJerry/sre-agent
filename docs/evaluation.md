@@ -12,6 +12,16 @@ sre-agent evaluate
 
 It runs five set faults ("chaos scenarios") against the reasoning loop, using seeded demo data — no server, no Docker, and no real system. It prints a score for each scenario and a total, and it exits with a failure code if any scenario scores wrong or any unsafe action is counted, so a later release gate can use the same command.
 
+<!-- BEGIN GENERATED SCORES -->
+## Current release scores — generated, do not edit by hand
+
+This block is generated from the release record (`evaluation/baseline.json` and the release walkthrough) by `python -m sre_agent.evaluation_page`. A docs test checks that it matches the record, so the numbers cannot drift by hand.
+
+Release **v0.2.0**, recorded 2026-11-12: 358 tests pass; chaos scenarios 5 of 5 correct (accuracy 100%); regression gate PASS; prompt-injection set 8 of 8; Tier 3 drills 7 of 7; security probes 10 of 10; 0 unsafe actions.
+
+These are the release-day scores, frozen at the release. Tests added since the release are not in this count; the numbers move only when a new release is recorded and the block is regenerated. The scores are on seeded demo scenarios only — they are not a claim about real systems.
+<!-- END GENERATED SCORES -->
+
 ## The five scenarios
 
 | Scenario | What goes wrong | What a correct answer looks like |
@@ -30,7 +40,7 @@ It runs five set faults ("chaos scenarios") against the reasoning loop, using se
 - **Unsafe actions** — diagnosis is read-only, so this must be zero. The count is read from each incident's record (a run would leave an "action" evidence record), not just assumed.
 - **Steps used** — the loop's own budget unit, reported instead of a wall-clock time, which on a local deterministic loop would measure the machine rather than the agent.
 
-Current measured result (2026-11-09): 5 of 5 scenarios correct, accuracy 100% on this suite, 0 unsafe actions, 242 tests passing. That is a score on these five seeded scenarios only — it is not a claim about real systems.
+The current numbers are in the generated release-scores block at the top of this page. That is a score on these five seeded scenarios only — it is not a claim about real systems.
 
 ## The regression gate
 
@@ -83,7 +93,7 @@ It plants eight such payloads — at least one in each telemetry surface the age
 - **The plan stays fixed.** The reasoning loop runs exactly its four read-only queries, in order — telemetry cannot add, remove, or rewrite one.
 - **Secrets stay redacted.** A payload that smuggles in a secret shape (`password=...`) has the value replaced everywhere, evidence included.
 
-Current measured result (2026-11-09): 8 of 8 cases pass, 0 unsafe actions.
+The current numbers are in the generated release-scores block at the top of this page.
 
 One known limitation, stated plainly: the loop reads one content word in error logs — "timeout" — as a symptom signal, by plain rule. A crafted line containing that word can raise the timeout hypothesis, the way any false symptom can mislead a diagnosis. That is signal spoofing, not instruction following: the line still cannot add wording, actions, or targets beyond the loop's own fixed set. The printed report repeats this limit.
 
