@@ -162,6 +162,13 @@ def test_quickstart_script_is_the_one_command_install() -> None:
         "sre-agent diagnose",
         "sre-agent evaluate",
         "set -eu",
+        # The 2026-11-12 field report's two fixes: a leftover
+        # .venv on an old Python is remade, not kept, and pip is
+        # refreshed before the install (an old pip cannot do an
+        # editable install).
+        "sys.version_info >= (3, 11)",
+        "rm -rf .venv",
+        "pip install --upgrade pip",
     ):
         assert needle in script
 

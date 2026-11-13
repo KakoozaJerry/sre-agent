@@ -8,8 +8,12 @@
 # What it does, in plain words:
 #   1. Makes a private Python folder (.venv) in this folder, if
 #      there is not one already. Nothing is installed system-wide.
-#   2. Installs sre-agent and the web server it needs into that
-#      folder, from this source copy.
+#      A leftover folder whose Python is older than 3.11 is
+#      removed and made again -- keeping it would fail later, in
+#      a less clear place.
+#   2. Refreshes pip inside that folder (an old pip cannot do the
+#      install below), then installs sre-agent and the web server
+#      it needs into that folder, from this source copy.
 #   3. Proves the install works: it prints the version, runs one
 #      demo diagnosis, and runs the five scored chaos scenarios.
 #      If any step fails, the script stops and says so -- it never
@@ -34,6 +38,11 @@ else
 fi
 
 echo "==> Step 1 of 3: private Python folder (.venv)"
+if [ -x .venv/bin/python ] \
+    && ! .venv/bin/python -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)'; then
+    echo "    The existing .venv uses a Python older than 3.11; removing it."
+    rm -rf .venv
+fi
 if [ ! -x .venv/bin/python ]; then
     "$PYTHON" -m venv .venv
     echo "    Made .venv with $("$PYTHON" --version 2>&1)."
@@ -42,6 +51,7 @@ else
 fi
 
 echo "==> Step 2 of 3: install sre-agent (server parts included)"
+.venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -e ".[server]"
 
 echo "==> Step 3 of 3: prove it works"

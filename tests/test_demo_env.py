@@ -1,6 +1,6 @@
 """Demo environment v1: the sample service and the wiring.
 
-Two kinds of checks live here:
+Three kinds of checks live here:
 
 - **Behaviour.** The sample service is plain Python, so its real
   HTTP routes are started on a spare local port and exercised:
@@ -12,6 +12,13 @@ Two kinds of checks live here:
   and webhook address must line up with the code that receives
   them. A full ``docker compose up`` run stays a human-run check;
   see docs/demo.md.
+- **The stack's visitor path (Phase 10).** The server the Compose
+  file runs is the shipped app, so the whole path a visitor takes
+  through the stack -- the Alertmanager-shaped alert the demo's
+  own config would send, the diagnosis, a restart approved by
+  name, and the resolved alert that closes the incident -- is run
+  against that app here, with the demo files' own labels and
+  summary text.
 """
 
 from __future__ import annotations
@@ -171,6 +178,105 @@ def test_dockerfiles_and_inject_script_exist_and_agree() -> None:
     script = _read(DEMO / "inject_fault.sh")
     assert "/chaos/on" in script
     assert "/chaos/off" in script
+
+
+# ---------------------------------------------------------------------------
+# The stack's visitor path (Phase 10): the shipped server, driven the
+# way the demo's own Prometheus and Alertmanager files would drive it
+# ---------------------------------------------------------------------------
+
+# The labels and summary are copied from demo/prometheus/alerts.yml:
+# they are what Prometheus attaches to the firing alert and what
+# Alertmanager then posts to the agent's webhook.
+_STACK_LABELS = {
+    "alertname": "HighErrorRate",
+    "service": "checkout",
+    "severity": "critical",
+    "namespace": "shop",
+    "environment": "demo",
+}
+_STACK_SUMMARY = "Checkout is returning errors in the demo environment"
+
+
+def _stack_payload(status: str) -> dict:
+    return {
+        "status": status,
+        "commonLabels": _STACK_LABELS,
+        "alerts": [
+            {
+                "status": status,
+                "labels": _STACK_LABELS,
+                "annotations": {"summary": _STACK_SUMMARY},
+                "startsAt": "2026-11-08T20:00:00Z",
+                "fingerprint": "demo-stack-visitor-path",
+            }
+        ],
+    }
+
+
+def test_the_stack_server_runs_the_whole_visitor_path() -> None:
+    from fastapi.testclient import TestClient
+
+    from sre_agent.server import app as shipped_app
+
+    client = TestClient(shipped_app)
+    received = client.post(
+        "/webhooks/alertmanager", json=_stack_payload("firing")
+    ).json()
+    assert received["results"][0]["created"] is True
+    incident_id = received["results"][0]["incident_id"]
+
+    # The alert arrives diagnosed, not just recorded: the server
+    # the Compose file runs diagnoses from the seeded demo data.
+    incident = client.get(f"/incidents/{incident_id}").json()
+    assert incident["status"] == "diagnosed"
+    assert incident["diagnosis"]
+    assert incident["evidence"]
+
+    # The restart waits for a person, under the shipped Tier 2
+    # policy, and runs only when approved by name.
+    proposed = client.post(
+        f"/incidents/{incident_id}/actions",
+        json={"runbook_id": "restart-workload"},
+    )
+    assert proposed.status_code == 201
+    body = proposed.json()
+    assert body["decision"] == "require_approval"
+    pending = body["pending"]
+    assert pending["runbook_id"] == "restart-workload"
+    approved = client.post(
+        f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
+        json={"by": "A Visitor"},
+    )
+    assert approved.status_code == 200
+    incident = client.get(f"/incidents/{incident_id}").json()
+    assert incident["status"] == "mitigating"
+
+    # The resolved alert -- send_resolved is on in the demo's
+    # Alertmanager config -- closes the incident.
+    closed = client.post(
+        "/webhooks/alertmanager", json=_stack_payload("resolved")
+    ).json()
+    assert closed["results"][0]["resolved"] is True
+    incident = client.get(f"/incidents/{incident_id}").json()
+    assert incident["status"] == "resolved"
+
+
+def test_demo_guide_matches_the_stack_as_it_runs_today() -> None:
+    guide = _read(REPO_ROOT / "docs" / "demo.md")
+    # Phase 10: the guide once said the loop was not wired and
+    # nothing could be fixed; both stopped being true in Phase 7,
+    # and the guide must not say them again.
+    assert "not** wired" not in guide
+    assert "Nothing in the demo can be fixed" not in guide
+    for needle in (
+        "docker compose up --build",
+        "diagnosed",
+        "approve",
+        "seeded demo data",
+        "no Docker in the build environment",
+    ):
+        assert needle in guide
 
 
 # ---------------------------------------------------------------------------
