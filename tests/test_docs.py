@@ -301,3 +301,54 @@ def test_operator_guide_states_the_phase7_evaluation_gate() -> None:
     assert "evaluation gate" in text
     assert "test_evaluation_gate.py" in text
     assert "fully wired" in text
+
+
+def test_readme_is_a_pitch_above_the_fold() -> None:
+    readme = _read(REPO_ROOT / "README.md")
+    # Phase 11: above the fold the README carries a capability
+    # table, the release-day score line, and links to the
+    # quickstart, the hosted demo and the evaluation page --
+    # all before the "In plain English" section.
+    above = readme.split("## In plain English", 1)[0]
+    assert "| Capability |" in above
+    assert "chaos 5 of 5" in above
+    assert "0 unsafe actions" in above
+    assert "#quick-start" in above
+    assert "#try-the-hosted-demo" in above
+    assert "docs/evaluation.md" in above
+
+
+def test_readme_status_is_short_and_complete() -> None:
+    readme = _read(REPO_ROOT / "README.md")
+    # Phase 11: the old Status wall is cut to about ten lines:
+    # current version, what works today, top scores, one honest
+    # limit, and a link to the progress log. The narrative lives
+    # in docs/progress.md and CHANGELOG.md, not here.
+    status = readme.split("## Status", 1)[1].split("## ", 1)[0]
+    lines = [line for line in status.strip().splitlines() if line.strip()]
+    assert len(lines) <= 10, f"Status has {len(lines)} lines, want about 10"
+    for needle in (
+        "0.2.0",
+        "What works today",
+        "chaos 5 of 5",
+        "One honest limit",
+        "docs/progress.md",
+    ):
+        assert needle in status
+
+
+def test_readme_opening_carries_the_positioning() -> None:
+    readme = _read(REPO_ROOT / "README.md")
+    # Phase 11 positioning: the wedge is auditability, stated in
+    # the opening above the fold -- the SRE agent you can audit,
+    # no API key, no model required, every claim cites its
+    # evidence, and every release ships its scores.
+    above = readme.split("## In plain English", 1)[0]
+    for needle in (
+        "The SRE agent you can audit",
+        "No API key",
+        "no model required",
+        "every claim cites its evidence",
+        "every release ships its scores",
+    ):
+        assert needle in above
