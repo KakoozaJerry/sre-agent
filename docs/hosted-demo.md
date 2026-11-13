@@ -3,9 +3,10 @@
 Phase 10 is about letting a visitor try the agent without
 installing anything. This page covers the piece that is built:
 the **public-safe demo mode** — the one server build that is
-meant to sit on a public address. The deployment itself is a
-later step: there is **no public URL yet**, and nothing on this
-page claims one.
+meant to sit on a public address. The demo is deployed and
+live at **https://sre-agent-demo.onrender.com** (Render free
+plan, deployed 12 November 2026, `/health` verified from
+outside).
 
 ## What public-safe means here
 
@@ -122,12 +123,13 @@ do for him:
    starts the service, checks `/health`, and gives it a public
    HTTPS address ending in `onrender.com`.
 
-Until that step happens there is **no public URL yet**, and
-this guide does not invent one. When it does happen, the URL
-will be recorded in [progress.md](progress.md), and the README
-will gain its "Try the hosted demo" link pointing at it —
-that link is the last Phase 10 item, and it can only point
-somewhere real once the address exists.
+That step happened on 12 November 2026. The address is
+**https://sre-agent-demo.onrender.com**, recorded in
+[progress.md](progress.md), and the README carries its
+"Try the hosted demo" link pointing at it. The visitor token
+is `sre-agent-demo-visitor`, sent in the
+`X-SRE-Agent-Token` header — public on purpose, for the
+reasons this page gives.
 
 ## What the hosted demo cannot do — honestly
 
@@ -139,10 +141,7 @@ somewhere real once the address exists.
 - A run is not a recovery: a restart that runs moves its
   incident to `mitigating`, never straight to `resolved`.
   Resolution still arrives only as a resolved alert.
-- It is not deployed yet. The host is chosen (Render, free
-  plan, $0 — named above before anything is paid for) and the
-  deployment package is ready and verified, but putting the
-  demo at a public HTTPS address still needs Abraham's own
-  Render sign-in, so there is no public URL yet. The deploy
-  and the URL will be recorded in
-  [progress.md](progress.md) when they happen.
+- It sleeps. On Render's free plan the service spins down
+  after about 15 minutes idle, so the first request can take
+  a minute to wake it, and a workspace gets 750 free instance
+  hours a month. It is a demo, not a production deployment.

@@ -71,7 +71,7 @@ def test_hosted_image_runs_the_hosted_factory_on_the_hosts_port() -> None:
     assert "sre_agent.server:app" not in text
 
 
-def test_hosted_demo_guide_names_host_cost_and_the_remaining_step() -> None:
+def test_hosted_demo_guide_names_host_cost_and_the_live_url() -> None:
     text = _read(REPO_ROOT / "docs" / "hosted-demo.md")
     for needle in (
         "Render",
@@ -79,15 +79,18 @@ def test_hosted_demo_guide_names_host_cost_and_the_remaining_step() -> None:
         "free web service",
         "render.yaml",
         "Dockerfile.hosted",
-        # The free plan's real limits, stated before anyone
-        # deploys: it sleeps when idle and hours are capped.
+        # The free plan's real limits, stated in the guide:
+        # it sleeps when idle and hours are capped.
         "15 minutes",
         "750",
-        # The health check that will watch the URL.
+        # The health check that watches the URL.
         "/health",
-        # The remaining step is the owner's own sign-in; the
-        # guide must not pretend a deployment already happened.
+        # The deployment happened on 2026-11-12 (the owner's own
+        # sign-in step, as the guide records); the guide must
+        # name the real public address, and must no longer claim
+        # there is none.
         "Abraham",
-        "no public URL yet",
+        "https://sre-agent-demo.onrender.com",
     ):
         assert needle in text
+    assert "no public URL yet" not in text

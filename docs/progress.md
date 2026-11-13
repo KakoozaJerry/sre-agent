@@ -2,6 +2,14 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 10 complete) — the demo is live
+
+- **The hosted demo is deployed: https://sre-agent-demo.onrender.com.** Abraham directed the deploy and did the steps that were his — creating the Render account, verifying his email, and adding the card Render asks new accounts for (identity verification: a temporary $1 authorisation, not a charge; the service itself is on the free plan, $0). Render built the repo's own Blueprint and the first deploy went live from commit 07a9540; `/health` was checked from outside and answers {"status":"ok"}.
+- The visitor token is **sre-agent-demo-visitor**, sent in the `X-SRE-Agent-Token` header, and it is public on purpose: the demo holds seeded data only, the Tier 3 demo grant is the only action that can run (rollback can never run there), and the ingestion caps are on. The README now has its "Try the hosted demo" section with the link, the token and the visitor path, and [hosted-demo.md](hosted-demo.md) records the address.
+- One honest correction to the entry below: it said no card is needed for Render's free plan. The plan is indeed free and nothing was charged, but Render did require a card for identity verification before it would create the service. Recorded here so the log stays true.
+- Free-plan limit, unchanged: the service sleeps after about 15 minutes idle, so a first request can take a minute to wake it.
+- Phase 10 is complete. Next is Phase 11: presentation and distribution.
+
 ## 13 November 2026 (Phase 10 continues) — the deployment package is ready; deploying is Abraham's sign-in step
 
 - This pass takes Phase 10's deployment item as far as it can honestly go without Abraham's own hosting account: **the host is chosen and its cost is named here, before anything is paid for, and everything that does not need his sign-in is built, verified, and in the repo.** The item itself stays unchecked — there is still no public URL — because claiming a deployment from a package would be claiming a result nobody measured.

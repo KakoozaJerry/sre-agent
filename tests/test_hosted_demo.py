@@ -12,8 +12,8 @@ address, so its safety rules are pinned here, not just described:
   that needs a human approval (rollback) is refused, creates no
   pending action, and the approval routes are disabled;
 - the ingestion caps stay on (an oversize payload is refused);
-- the guide exists and states the honest limits, including that
-  no public URL exists yet.
+- the guide exists and states the honest limits, including the
+  live public URL (deployed 2026-11-12).
 """
 
 from __future__ import annotations
@@ -195,10 +195,11 @@ def test_hosted_demo_guide_states_the_rules_and_the_limits() -> None:
         "Tier 3",
         "Seeded demo data only",
         "SRE_AGENT_API_TOKEN",
-        "no public URL yet",
+        "https://sre-agent-demo.onrender.com",
         "rollback",
         "100 alerts",
     ):
         assert needle in text
+    assert "no public URL yet" not in text
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     assert "docs/hosted-demo.md" in readme
