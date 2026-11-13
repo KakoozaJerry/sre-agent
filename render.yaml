@@ -1,0 +1,23 @@
+# Render Blueprint for the hosted demo (Phase 10).
+#
+# The host is Render and the plan is its free web service: $0.
+# Host and cost were named in docs/progress.md before anything
+# was paid for, and on the free plan nothing is paid at all.
+# See docs/hosted-demo.md for the deploy steps and the limits
+# that come with the free plan.
+#
+# The one secret, the demo token, is never written in this
+# repo: `sync: false` means Render asks Abraham to type its
+# value in the dashboard when he applies this Blueprint.
+services:
+  - type: web
+    name: sre-agent-demo
+    runtime: docker
+    dockerfilePath: ./Dockerfile.hosted
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: SRE_AGENT_API_TOKEN
+        sync: false

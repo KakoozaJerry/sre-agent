@@ -64,6 +64,71 @@ The tests in `tests/test_hosted_demo.py` run exactly this path,
 plus the refusals: no token, a wrong token, a rollback, and an
 oversize payload.
 
+## Deploying it — the host, the cost, and the one step left
+
+The host is chosen, and the cost is named here before anything
+is paid for, as the plan requires:
+
+- **Host: Render**, as a **free web service**. The cost is
+  **$0**: nothing is paid, and no card is needed for the free
+  plan. If the demo ever outgrows the free plan, the cost of a
+  paid plan will be named here before anything is paid for then
+  either.
+- **The package is ready in this repo.** `render.yaml` is a
+  Render Blueprint: it names the service (`sre-agent-demo`),
+  the free plan, the Oregon region, the Docker runtime, and
+  `Dockerfile.hosted` as the image to build. `Dockerfile.hosted`
+  installs from the hash-checked lock file, runs as a user who
+  is not root, and starts the hosted demo factory — the build
+  that refuses to start without a token — on the port Render
+  assigns (`$PORT`). The token is never written in this repo:
+  `render.yaml` marks `SRE_AGENT_API_TOKEN` as `sync: false`,
+  which means Render asks for its value at deploy time instead.
+- **The health check is set.** `render.yaml` sets Render's
+  health check path to `/health` — the one open route — so
+  Render watches the service's health at its URL once it is
+  deployed, and replaces a copy that stops answering it.
+- **The free plan's limits, stated before anyone deploys.** A
+  free web service spins down after 15 minutes with no traffic,
+  and the next visitor waits about a minute while it starts
+  again. A workspace gets 750 free instance hours a month; when
+  they run out, its free services pause until the next month.
+  That is acceptable for a demo people visit now and then, and
+  it is not production hosting — Render says so itself.
+
+The deployment package was verified in its build pass the one
+way this environment allows: there is no Docker here, so the
+image itself was not built; instead the image's exact steps
+were run by hand — install from the lock file with hashes
+checked, install the package, start the hosted factory with a
+token on a chosen port — and a visitor's whole path was then
+run over real HTTP against that server: `/health` answered,
+a request with no token was refused, the demo alert was
+diagnosed, the Tier 3 restart ran to `mitigating`, and the
+resolved alert closed the incident.
+
+**The one step left is Abraham's.** Deploying needs Abraham's
+own Render account and his own sign-in, which no one else can
+do for him:
+
+1. Sign in to Render and choose **New → Blueprint**.
+2. Select this repository (`KakoozaJerry/sre-agent`). Render
+   reads `render.yaml` and proposes the `sre-agent-demo`
+   service on the free plan.
+3. When Render asks for `SRE_AGENT_API_TOKEN`, type a token
+   value of his choosing. That value goes only into Render —
+   never into this repo.
+4. Apply the Blueprint. Render builds `Dockerfile.hosted`,
+   starts the service, checks `/health`, and gives it a public
+   HTTPS address ending in `onrender.com`.
+
+Until that step happens there is **no public URL yet**, and
+this guide does not invent one. When it does happen, the URL
+will be recorded in [progress.md](progress.md), and the README
+will gain its "Try the hosted demo" link pointing at it —
+that link is the last Phase 10 item, and it can only point
+somewhere real once the address exists.
+
 ## What the hosted demo cannot do — honestly
 
 - It cannot touch anything real. Every number, workload and
@@ -74,8 +139,10 @@ oversize payload.
 - A run is not a recovery: a restart that runs moves its
   incident to `mitigating`, never straight to `resolved`.
   Resolution still arrives only as a resolved alert.
-- It is not deployed yet. Choosing the host, naming any cost
-  before anything is paid for, putting the demo at a public
-  HTTPS address and watching its health are the next Phase 10
-  steps, and they will be recorded in
+- It is not deployed yet. The host is chosen (Render, free
+  plan, $0 — named above before anything is paid for) and the
+  deployment package is ready and verified, but putting the
+  demo at a public HTTPS address still needs Abraham's own
+  Render sign-in, so there is no public URL yet. The deploy
+  and the URL will be recorded in
   [progress.md](progress.md) when they happen.

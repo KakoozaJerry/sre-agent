@@ -1,0 +1,25 @@
+# The hosted demo image (Phase 10): the public-safe demo server
+# from src/sre_agent/hosted_demo.py, for the Render deployment
+# described in docs/hosted-demo.md.
+#
+# It differs from the demo environment's Dockerfile in two ways:
+# it runs the hosted demo factory — which refuses to start at
+# all without SRE_AGENT_API_TOKEN set — and it listens on the
+# port the host assigns ($PORT), not a fixed 8080.
+FROM python:3.12-slim
+WORKDIR /app
+COPY pyproject.toml README.md requirements.lock ./
+COPY src ./src
+# Dependencies come from the lock file, with hashes checked
+# (requirements.lock; finding F-06). The package itself is then
+# installed without dependencies, because the lock already
+# installed the exact ones it needs.
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock \
+    && pip install --no-cache-dir --no-deps .
+# The server does not run as root (finding F-06).
+RUN useradd --create-home --uid 10001 sreagent \
+    && chown -R sreagent:sreagent /app
+USER sreagent
+# The port the server actually binds is $PORT (default 8080).
+EXPOSE 8080
+CMD ["sh", "-c", "exec uvicorn --factory sre_agent.hosted_demo:create_hosted_demo_app --host 0.0.0.0 --port ${PORT:-8080}"]
