@@ -333,6 +333,12 @@ def test_readme_is_a_pitch_above_the_fold() -> None:
     assert "#quick-start" in above
     assert "#try-the-hosted-demo" in above
     assert "docs/evaluation.md" in above
+    # The score line carries no hand-typed test count: the
+    # count went stale once already (404, left over while the
+    # suite grew past it, and never the release-day 358), so
+    # counts live in the generated evaluation block and the
+    # progress log, not in the pitch.
+    assert not re.search(r"\d+ tests", above)
 
 
 def test_readme_status_is_short_and_complete() -> None:
@@ -352,6 +358,7 @@ def test_readme_status_is_short_and_complete() -> None:
         "docs/progress.md",
     ):
         assert needle in status
+    assert not re.search(r"\d+ tests", status)
 
 
 def test_evaluation_page_scores_block_is_generated_and_current() -> None:

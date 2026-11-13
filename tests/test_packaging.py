@@ -3,8 +3,8 @@
 The metadata in ``pyproject.toml`` is what PyPI will show
 when the package is published. These tests pin the facts —
 URLs, keywords, classifiers — so a later edit cannot drop
-them quietly, and pin the README's honest statement that
-the package is not on PyPI yet.
+them quietly, and pin the README's honest warning that the
+PyPI name sre-agent already belongs to a different project.
 """
 
 from __future__ import annotations
@@ -50,10 +50,19 @@ def test_requires_python_matches_the_classifier_floor() -> None:
     assert project["requires-python"] == ">=3.11"
 
 
-def test_readme_documents_pipx_as_the_future_user_path_honestly() -> None:
+def test_readme_warns_that_the_pypi_name_is_taken() -> None:
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     flat = " ".join(readme.split())
-    assert "pipx install sre-agent" in flat
-    assert "not on PyPI yet" in flat
+    # Phase 11, corrected 2026-11-13: the PyPI name sre-agent
+    # already belongs to a different SRE agent (Fuzzy Labs,
+    # versions 0.1.0 to 0.2.1, read back on PyPI), so the
+    # README must warn that pipx under that name installs
+    # theirs -- not present the name as this project's path,
+    # and not claim the command does not work today.
+    assert "Do not run `pipx install sre-agent` expecting this project" in flat
+    assert "already belongs to a different SRE agent" in flat
+    assert "Fuzzy Labs" in flat
+    assert "no install of this project from PyPI yet" in flat
+    assert "not on PyPI yet" not in flat
     # The contributor quickstart stays the install path today.
     assert "./quickstart.sh" in readme

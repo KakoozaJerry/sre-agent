@@ -2,6 +2,16 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 11 continues) — the PyPI name is already taken
+
+- **The name this project planned to publish under belongs to someone else.** Reading PyPI itself — the registry the distribution plan always pointed at, never actually read until now — shows `sre-agent` is a different SRE agent, published by Fuzzy Labs, at versions 0.1.0 (November 2025), 0.2.0 and 0.2.1 (March 2026). This project cannot publish a package under that name.
+- **The README had it backwards, in the dangerous direction.** It said the package "is not on PyPI yet, so that command does not work today". In fact `pipx install sre-agent` works today — and installs Fuzzy Labs' agent, not this one. The user-install section now says exactly that, names the other publisher, and warns readers not to run the command expecting this project.
+- **A new name is Abraham's decision, and it comes first.** Five names were checked on PyPI today and are free — `sre-agent-audit`, `auditable-sre-agent`, `sreagent`, `kakooza-sre-agent`, `sre-agent-cli` — listed here as facts, not a recommendation. The project file still carries the taken name until he chooses; nothing was renamed in this pass.
+- **One more stale number fixed the same way.** The README's score line and Status section still said "404 tests" — a count from the morning's pitch work that was never the release-day figure (358) and is no longer the suite's size (432). Both spots now carry no hand-typed test count at all: release-day counts live in the evaluation page's generated block, and current counts live in this log. A test now fails if a hand-typed count comes back.
+- Everything checked here holds: all 432 tests pass (two existing tests were rewritten to pin the corrected words — none added), the style and type checks are clean, and every scored check is unchanged — scenarios 5 of 5, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions. The hosted demo was checked from outside and is healthy.
+- Still open in Phase 11: choosing the PyPI name, then publishing to PyPI and the demo image to GHCR (no public image yet), and the social preview (a website setting).
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 13 November 2026 (Phase 11 continues) — something to watch: the walkthrough, recorded
 
 - **Phase 11's recording item is done.** The README now carries a terminal recording of the walkthrough under the pitch: 74 seconds, four stages — the demo alert arrives, the diagnosis is read, the restart is approved by a named human, and the resolved alert closes the incident.

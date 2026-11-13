@@ -10,7 +10,7 @@ An autonomous SRE agent that detects production incidents, works out what is wro
 
 Built in the open by [Abraham Kakooza](https://github.com/KakoozaJerry).
 
-**v0.2.0 · 404 tests · chaos 5 of 5 · regression PASS · injection 8 of 8 · Tier 3 drills 7 of 7 · security probes 10 of 10 · 0 unsafe actions** — full scores in [docs/evaluation.md](docs/evaluation.md).
+**v0.2.0 · chaos 5 of 5 · regression PASS · injection 8 of 8 · Tier 3 drills 7 of 7 · security probes 10 of 10 · 0 unsafe actions** — full scores in [docs/evaluation.md](docs/evaluation.md).
 
 [Quick start](#quick-start) · [Try the hosted demo](#try-the-hosted-demo) · [Evaluation](docs/evaluation.md) · [Progress log](docs/progress.md)
 
@@ -50,7 +50,7 @@ The agent is never given free rein. It cannot run arbitrary commands, it can onl
 
 **Current version:** 0.2.0. Phases 0–10 are complete; Phase 11 (presentation and distribution) is in progress.
 **What works today:** alert ingestion, evidence-cited diagnosis in the server, human-approved fixes, the Tier 3 demo grant, memory advice, read adapters, a database store, and a live hosted demo.
-**Top scores (v0.2.0, deterministic backend):** chaos 5 of 5, regression PASS, injection 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions; 404 tests pass.
+**Top scores (v0.2.0, deterministic backend):** chaos 5 of 5, regression PASS, injection 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions.
 **One honest limit:** it does not manage real production systems yet — it is proven on seeded demo data, and the live adapters are untested against real systems.
 The full history lives in [docs/progress.md](docs/progress.md) and [CHANGELOG.md](CHANGELOG.md); this section stays short on purpose.
 
@@ -149,18 +149,21 @@ For development (the test tools as well), install
 ### Installing as a user, not a contributor
 
 The quickstart above is the contributor path: it installs
-from a clone of this repository. The user install path,
-once the package is published to PyPI, will be:
+from a clone of this repository. There is no install of
+this project from PyPI yet — and one warning matters here:
 
-```bash
-pipx install sre-agent
-```
+**Do not run `pipx install sre-agent` expecting this
+project.** The name `sre-agent` on PyPI already belongs to
+a different SRE agent, published by Fuzzy Labs (checked on
+PyPI on 13 November 2026: versions 0.1.0 to 0.2.1). That
+command works today — and installs their agent, not this
+one.
 
-`sre-agent` is not on PyPI yet, so that command does not
-work today — do not use it until a release announces the
-PyPI publication. Until then, the quickstart from source
-above is the only install path, and the hosted demo needs
-no install at all. The package metadata in
+This project cannot publish under that name. A new PyPI
+name must be chosen first; until a release announces the
+chosen name and its publication, the quickstart from
+source above is the only install path, and the hosted
+demo needs no install at all. The package metadata in
 `pyproject.toml` (project URLs, keywords and classifiers)
 is ready for that publication; publishing itself, and
 publishing the demo image to GHCR, are release steps that
