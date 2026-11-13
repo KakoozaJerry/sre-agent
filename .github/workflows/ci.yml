@@ -41,7 +41,10 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run the one-command quickstart from the clean checkout
-        run: ./quickstart.sh
+        # Through bash, not ./quickstart.sh: the repository's batch
+        # pushes cannot carry the file's executable bit, so the job
+        # must not depend on it. The script itself is unchanged.
+        run: bash quickstart.sh
       - name: Scored CLI checks
         run: |
           .venv/bin/sre-agent evaluate
