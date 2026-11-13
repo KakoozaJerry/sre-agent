@@ -1,0 +1,8 @@
+{"version": 2, "width": 100, "height": 36, "timestamp": 1794597449, "env": {"SHELL": "/bin/bash", "TERM": "xterm-256color"}, "title": "sre-agent: one alert, end to end"}
+[0.0, "o", "sre-agent -- one alert, end to end (seeded demo data only)\r\n\r\n$ uvicorn sre_agent.server:app --port 8080   # terminal 1: the server\r\n$ curl http://localhost:8080/health          # terminal 2\r\n{\"status\":\"ok\"}\r\n"]
+[10.0, "o", "\r\n$ curl -X POST http://localhost:8080/webhooks/generic \\\r\n    -d '{\"alert_name\":\"HighErrorRate\",\"service\":\"checkout\",...}'\r\ncreated: true   status: diagnosed\r\ndiagnosis: Most likely: A call that checkout depends on is timing out\r\n"]
+[24.0, "o", "\r\n$ sre-agent show <incident-id>\r\nStatus: diagnosed\r\nDiagnosis: Most likely: A call that checkout depends on is timing out\r\n- A call that checkout depends on is timing out (confidence 0.85)\r\nEvidence (8 record(s)):\r\n"]
+[40.0, "o", "\r\n$ curl -X POST .../incidents/<incident-id>/actions \\\r\n    -d '{\"runbook_id\":\"restart-workload\"}'\r\n201  decision: require_approval (Tier 2: a human must approve)\r\npending: restart-workload, touches 2 replicas, expires in 15 minutes\r\n"]
+[50.0, "o", "\r\n$ curl -X POST .../approvals/<pending-id>/approve -d '{\"by\":\"operator\"}'\r\nRestarted checkout: restarts now 1, failing state cleared.\r\nincident_status: mitigating  (a run fix is not yet proof it worked)\r\n"]
+[64.0, "o", "\r\n$ curl -X POST http://localhost:8080/webhooks/generic \\\r\n    -d '{...,\"status\":\"resolved\"}'\r\nresolved: true   status: resolved\r\n\r\nDone: alert -> diagnosis -> approve -> resolved.\r\n"]
+[74.0, "o", "\r\n(End of recording. The same walkthrough in text is in the README.)\r\n"]

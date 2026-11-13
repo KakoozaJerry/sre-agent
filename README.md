@@ -26,6 +26,12 @@ Built in the open by [Abraham Kakooza](https://github.com/KakoozaJerry).
 | Model backend | A language-model backend behind the same report shape, off by default; scores published separately per backend (see below) |
 | Hosted demo | Public demo on seeded data only, token required, Tier 3 grant the only runnable action |
 
+## Watch it: one alert in about a minute
+
+![Terminal recording: one alert, end to end](docs/walkthrough.svg)
+
+A 74-second terminal recording of the walkthrough below, made from a real run of the shipped server (alert, diagnosis, approve, resolved) — output lines are shortened for the screen, and the values shown are the real replies, checked by the script that made it, [demo/make_walkthrough_recording.py](demo/make_walkthrough_recording.py). The pauses are reading pauses, not the agent's speed. Play the full recording with `asciinema play demo/walkthrough.cast` (the file is [demo/walkthrough.cast](demo/walkthrough.cast)).
+
 ## In plain English
 
 When a production system breaks, an on-call engineer gets paged, opens five different tools, pieces together what happened, tries a fix, and checks it worked. Most of the time goes on figuring out what is wrong, not on the fix itself.
