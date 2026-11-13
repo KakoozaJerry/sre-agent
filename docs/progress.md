@@ -2,6 +2,14 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 11 continues) — the positioning is set, and CI's first run tells the truth
+
+- **Phase 11's positioning item is done.** The words a visitor sees first are now the same in both places: the README opening (done this morning, pinned by a test) and GitHub's own fields. Abraham set the repository description and Topics on the website; this pass read them back in two places — the repository search record and the repository page — and both show the description word for word as prepared ("The SRE agent you can audit: no API key, no model required, every claim cites its evidence, and every release ships its scores.") and the Topics exactly sre, ai-agent, incident-response, observability, devops. The item is checked off only now, because that read-back is the standard the project set for claiming it.
+- **The CI workflow is in place — and its first run is not green, which is the new job doing exactly what it was built to do.** Abraham placed the prepared workflow on the website, with its tests and the contributing-guide note; all three read back identical to the package prepared here. On run #175's page, the six test jobs (three Pythons on two systems) carry warnings only — but both quickstart jobs failed: Ubuntu with exit code 126, macOS with exit code 1. Exit 126 means "cannot execute", which matches the known problem: quickstart.sh's executable bit is lost whenever files are uploaded through the API connection, and only a real git push can set it. The macOS job's own log was not read in this pass, so its failure is recorded, not explained. The CI item stays unchecked until a run there is green; the Ubuntu half's fix is the same real-git mode fix Abraham applied by hand before.
+- Everything checked here is unchanged: all 427 tests pass, the style and type checks are clean, and every scored check holds — scenarios 5 of 5, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions.
+- Still open in Phase 11: the recording, the social preview (a website setting this connection cannot read back, so it stays unverified), PyPI/GHCR publishing, and a green CI run.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 13 November 2026 (Phase 10 fix) — the demo link gets a landing page
 
 - **The bug, reported by Abraham: the demo link "crashed".** The service was up the whole time — `/health` answered 200 and the API behaved exactly as designed — but the bare address itself, the link a person actually taps, had no route at all and answered `404 {"detail":"Not Found"}`. A link that lands on an error is a broken link, whatever the API is doing.
