@@ -2,6 +2,14 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 12 November 2026 (later) — verification pass: everything still passes, and the public copy agrees in full
+
+- A check at the start of this pass found the public copy at the single commit that carried the last pass's Phase 9 work, and reading the nine changed files back showed each one matching the local copy exactly. Nothing is waiting to upload.
+- Everything was checked again locally, and nothing has moved: all 389 tests pass, the style and type checks are clean, the five chaos scenarios score 5 of 5, the regression gate passes against the v0.2.0 record, the hostile-text set passes 8 of 8, the Tier 3 drills pass 7 of 7, and the security probes pass 10 of 10 — 0 unsafe actions.
+- One small thing is now proven rather than hoped: the one-commit upload route has carried two batches in a row (the big Phase 7–9 batch and the Phase 9 finishing batch), each checked by reading the public copy back. An upload is judged by that read-back, never by the reply text — the lesson an earlier pass learned the hard way.
+- No new feature was started, and no new phase was invented. The roadmap is finished — Phases 0 to 9 are all checked off — and what comes next is still Abraham's direction call.
+- Upload, stated plainly: this pass pushes just these two files (this log and the plan) as one batch and checks each one by reading the public copy back afterwards.
+
 ## 12 November 2026 (Phase 9 is complete) — each backend now has its own scores
 
 - One piece of bookkeeping first, stated plainly: a check at the start of this pass found the public copy at the single commit that carried the whole Phase 7, Phase 8 and Phase 9 batch and the v0.2.0 release. Nothing is waiting any more, so this pass's upload is only its own work, checked by reading the public copy back.
