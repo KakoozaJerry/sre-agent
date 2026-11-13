@@ -2,6 +2,14 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 11 continues) — CI is green, and the red run after it is not a failure
+
+- **Phase 11's CI item is done.** The fix for the failed quickstart jobs was simple: the CI step now runs the install script through `bash` instead of depending on its executable bit, which the file uploads here cannot carry — and Abraham also restored the bit itself with a real git push from his Mac (that commit changes nothing but the file's permissions). With that in place, run #178 passed everything: all eight jobs — the tests on Python 3.11, 3.12 and 3.13 across Ubuntu and macOS (style and type checks included) and the clean-checkout quickstart job on both systems, which runs the five scored checks after installing. A fully green run is what this item was waiting for, so it is checked off.
+- **The newest run looks red, and the honest reading matters more than the colour.** Run #179, on the current code, shows as failed — but no test failed in it. Seven of its eight jobs passed, both quickstart jobs included; the eighth, the macOS test job on Python 3.13, was cancelled before it started because GitHub could not provide a runner machine for it (its own note names an internal server error and tight macOS capacity). A red run is a claim to read job by job, not a verdict — that lesson is now written into the plan too.
+- Everything checked here is unchanged: all 427 tests pass, the style and type checks are clean, and every scored check holds — scenarios 5 of 5, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions.
+- Still open in Phase 11: the terminal recording, the social preview (a website setting this connection cannot read back, so it stays unverified), and publishing the package to PyPI and the demo image to GHCR.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 13 November 2026 (Phase 11 continues) — the positioning is set, and CI's first run tells the truth
 
 - **Phase 11's positioning item is done.** The words a visitor sees first are now the same in both places: the README opening (done this morning, pinned by a test) and GitHub's own fields. Abraham set the repository description and Topics on the website; this pass read them back in two places — the repository search record and the repository page — and both show the description word for word as prepared ("The SRE agent you can audit: no API key, no model required, every claim cites its evidence, and every release ships its scores.") and the Topics exactly sre, ai-agent, incident-response, observability, devops. The item is checked off only now, because that read-back is the standard the project set for claiming it.
