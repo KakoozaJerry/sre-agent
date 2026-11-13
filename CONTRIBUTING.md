@@ -59,6 +59,14 @@ purpose, at a release, with
 `sre-agent regression-check --update-baseline` — a gate that
 re-recorded its own baseline would prove nothing.
 
+Those same checks run automatically in CI
+(`.github/workflows/ci.yml`): the test job runs lint, types
+and the full suite on Python 3.11, 3.12 and 3.13, on both
+Ubuntu and macOS, and a second job runs `./quickstart.sh`
+from a clean checkout — a stranger's first run, exactly as
+shipped — and then the scored CLI checks against that
+install.
+
 ## The rules that do not bend
 
 These come from the project's safety model
