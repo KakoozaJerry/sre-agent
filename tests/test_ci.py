@@ -47,10 +47,12 @@ def test_ci_runs_lint_types_and_tests() -> None:
 
 def test_ci_quickstart_job_runs_script_then_scored_checks() -> None:
     section = _quickstart_section()
-    # The quickstart must run on the clean checkout as checked
+    # The quickstart must run on the clean checkout through bash:
+    # batch pushes cannot carry the script's executable bit, so
+    # the job must not depend on it (run #175 failed exactly so).
     # out: no install step before it in this job, or the job
     # would no longer prove a stranger's first run works.
-    script_at = section.index("./quickstart.sh")
+    script_at = section.index("bash quickstart.sh")
     assert "pip install" not in section[:script_at]
     # Every scored CLI check the contributing guide lists runs
     # against the quickstart's own install.
