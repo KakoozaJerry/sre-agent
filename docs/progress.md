@@ -2,6 +2,12 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 10 fix) — the demo link gets a landing page
+
+- **The bug, reported by Abraham: the demo link "crashed".** The service was up the whole time — `/health` answered 200 and the API behaved exactly as designed — but the bare address itself, the link a person actually taps, had no route at all and answered `404 {"detail":"Not Found"}`. A link that lands on an error is a broken link, whatever the API is doing.
+- The fix: the hosted demo build now serves a small landing page at `GET /`, open like `/health` because it serves no data and runs no action — it explains the demo, prints the visitor token (public on purpose), shows the two commands a visitor needs, and states the limits. Every API route still refuses a missing token (401), pinned by a new test (427 total). The guide and the README now say there are two open routes, and the module's own "no public URL yet" sentence — stale since the deploy — is corrected.
+- Upload: this fix pushes its changed files as one batch and checks each one by reading the public copy back afterwards; Render redeploys from the new commit automatically.
+
 ## 13 November 2026 (Phase 11 continues) — CI now aims at the bar the guide sets, prepared and checked here
 
 - This pass prepares Phase 11's CI item: **the CI workflow now runs the checks the contributing guide already asked every person to run.** Before, the automatic checks ran one Python (3.12) on one system (Ubuntu), with no type check — while the guide demanded eight checks, the project file promised Python 3.11 to 3.13, and the quickstart is written for Macs as well. A bar that only humans run is a bar that quietly stops being run.

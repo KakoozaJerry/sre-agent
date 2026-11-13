@@ -50,7 +50,7 @@ The full history lives in [docs/progress.md](docs/progress.md) and [CHANGELOG.md
 
 ## Try the hosted demo
 
-The agent runs in public at **https://sre-agent-demo.onrender.com** — no install, nothing to set up. Every route except `/health` needs the visitor token, sent in the `X-SRE-Agent-Token` header: `sre-agent-demo-visitor`. The token is public on purpose — [docs/hosted-demo.md](docs/hosted-demo.md) explains why that is safe here.
+The agent runs in public at **https://sre-agent-demo.onrender.com** — no install, nothing to set up. Every API route needs the visitor token, sent in the `X-SRE-Agent-Token` header: `sre-agent-demo-visitor`. (The landing page at the address itself and `/health` are open — they serve no data.) The token is public on purpose — [docs/hosted-demo.md](docs/hosted-demo.md) explains why that is safe here.
 
 A visitor can: check `/health`; send the demo alert and read the evidence-cited diagnosis; watch the Tier 3 demo restart run (restart and scale, shop namespace only, at most three replicas); and close the incident with a resolved alert. What it cannot do is stated just as plainly: the data is seeded demo data, nothing real is touched, and rollback can never run there — it needs a human, and the hosted mode has no approval path at all. One free-plan limit: the service sleeps after about 15 minutes idle, so the first request can take a minute to wake it.
 

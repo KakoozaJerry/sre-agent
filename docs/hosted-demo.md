@@ -52,7 +52,9 @@ SRE_AGENT_API_TOKEN=choose-a-token \
 
 Then a visitor's path, with the token in the header:
 
-1. Check it is up: `GET /health` (the one open route).
+1. Open the address in a browser: the landing page at `GET /`
+   explains the demo and prints the token. It and `GET /health`
+   are the two open routes; every API route needs the token.
 2. Send the demo checkout alert to `POST /webhooks/generic` and
    read the diagnosis on the incident it opens.
 3. Propose the restart (`POST /incidents/<id>/actions` with

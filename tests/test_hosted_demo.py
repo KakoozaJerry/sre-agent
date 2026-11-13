@@ -187,6 +187,22 @@ def test_ingestion_caps_stay_on_in_hosted_mode(
     assert hosted_client.get("/incidents", headers=HEADERS).json() == []
 
 
+def test_landing_page_is_open_and_explains_the_demo(
+    hosted_client: TestClient,
+) -> None:
+    # The bare address is the link a visitor is handed, so it
+    # must answer with no token (like /health) and explain the
+    # demo. It serves no data: the only secret-shaped thing on
+    # it is the visitor token, which is public on purpose.
+    response = hosted_client.get("/")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "sre-agent-demo-visitor" in response.text
+    assert "X-SRE-Agent-Token" in response.text
+    # Every data route still refuses a missing token.
+    assert hosted_client.get("/incidents").status_code == 401
+
+
 def test_hosted_demo_guide_states_the_rules_and_the_limits() -> None:
     text = (REPO_ROOT / "docs" / "hosted-demo.md").read_text(
         encoding="utf-8"
