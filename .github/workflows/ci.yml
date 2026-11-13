@@ -7,15 +7,45 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check src tests
+      - name: Type check
+        run: mypy src
+      - name: Unit tests (incl. the safety policy suite)
+        run: pytest -q
+
+  quickstart:
+    name: Quickstart from a clean checkout (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install
-        run: pip install -e ".[dev]"
-      - name: Lint
-        run: ruff check src tests
-      - name: Unit tests (incl. the safety policy suite)
-        run: pytest -q
+      - name: Run the one-command quickstart from the clean checkout
+        run: ./quickstart.sh
+      - name: Scored CLI checks
+        run: |
+          .venv/bin/sre-agent evaluate
+          .venv/bin/sre-agent regression-check
+          .venv/bin/sre-agent injection-check
+          .venv/bin/sre-agent tier3-check
+          .venv/bin/sre-agent security-check
