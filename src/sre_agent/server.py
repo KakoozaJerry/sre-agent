@@ -129,6 +129,17 @@ backend, so its approvals act on the seeded demo workloads only
 and claim nothing about a real system; an app built without a
 policy or a backend holds no approvals, and its approval routes
 answer 409 saying so.
+
+Hosted demo mode (Phase 10): a server built with
+``tier3_only=True`` can run only what its policy allows outright.
+A proposal the policy sends for a human's approval is refused
+with 403 and no pending action is created, and the approve and
+reject routes answer 409 — in that mode there is no approval
+path at all, so the only actions that can ever run are the ones
+a Tier 3 grant pre-approved. ``hosted_demo.py`` builds the
+public-safe server this way: a token is required, the data is
+the seeded demo data only, and the policy is the demo Tier 3
+grant. See ``docs/hosted-demo.md``.
 """
 
 from __future__ import annotations
@@ -269,6 +280,7 @@ def create_app(
     adapters: AdapterSources | None = None,
     memory: IncidentMemory | None = None,
     diagnosis_backend: DiagnosisBackend | None = None,
+    tier3_only: bool = False,
 ) -> FastAPI:
     """Build the webhook app. Pass a store to share or inspect state.
 
@@ -311,6 +323,12 @@ def create_app(
     incidents, diagnoses and pending approvals persist in its
     file and are restored when a server is built on it again.
     With the in-memory store (the default) nothing persists.
+
+    ``tier3_only`` turns off the approval path: a proposal the
+    policy does not allow outright is refused and never becomes
+    a pending action, and the approve/reject routes answer 409.
+    Only a policy ALLOW — in the hosted demo, the demo Tier 3
+    grant — can run an action on such a server.
     """
     incident_store = store if store is not None else IncidentStore()
     loop = (
@@ -507,6 +525,20 @@ def create_app(
                 "incident_status": incident.status.value,
                 "pending": None,
             }
+        if tier3_only:
+            # Hosted demo mode: there is no approval path, so a
+            # proposal that is not allowed outright cannot run.
+            # The decision is already in the audit log; nothing
+            # becomes pending and nothing runs.
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "this server runs only actions its policy allows "
+                    "outright (the Tier 3 demo grant); "
+                    f"{body.runbook_id} needs a human approval, and "
+                    "approvals are disabled in hosted demo mode"
+                ),
+            )
         pending = create_pending(action, result, incident_id=incident.id)
         pendings[pending.id] = pending
         incident_store.save_approval(pending, None)
@@ -537,6 +569,14 @@ def create_app(
     ) -> dict[str, object]:
         incident = _incident_or_404(incident_id)
         policy, executor = _approvals_or_409()
+        if tier3_only:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "approvals are disabled in hosted demo mode; "
+                    "only the Tier 3 demo grant can run an action"
+                ),
+            )
         pending = _pending_or_404(incident_id, pending_id)
         if pending.id in decisions:
             raise HTTPException(
@@ -589,6 +629,14 @@ def create_app(
     ) -> dict[str, object]:
         incident = _incident_or_404(incident_id)
         _approvals_or_409()
+        if tier3_only:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "approvals are disabled in hosted demo mode; "
+                    "only the Tier 3 demo grant can run an action"
+                ),
+            )
         pending = _pending_or_404(incident_id, pending_id)
         if not body.by.strip():
             raise HTTPException(

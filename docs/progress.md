@@ -2,6 +2,17 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 12 November 2026 (Phase 10 starts) — a public-safe demo mode
+
+- Phase 10 — the hosted demo — has started, and this pass builds the piece that has to come before any public address: **a public-safe demo mode**. It is one server build (`create_hosted_demo_app` in `hosted_demo.py`) with every safety rule switched on at once, in one place, so a later deployment cannot quietly forget one of them. The guide is [hosted-demo.md](hosted-demo.md).
+- A token is required, with no fallback: the server is not built at all without one. Building it with no token fails with an error, instead of using the unauthenticated mode the local server allows. With a token set, every page except `/health` needs it.
+- It only ever sees seeded demo data: the demo diagnosis data, the demo past incidents, and the demo workloads. Nothing real is read or touched, and there are no real credentials anywhere in it — the token is the only secret.
+- The Tier 3 demo grant is the only action that can run. Restart and scale in the demo's shop area, touching at most three copies at once, are pre-approved and run at once. Anything that would need a person's approval cannot run here at all: the approval path is switched off in the server for this mode, so a rollback is refused, leaves nothing waiting, and there is no approval page for anyone to use. That is deliberate — a public demo should not hand out approvals.
+- The size limits stay on: at most 100 alerts in one payload, capped labels and summaries, at most 200 evidence records per incident and 1,000 incidents held.
+- A visitor's whole path was checked in tests: send the demo alert, read the diagnosis, run the pre-approved restart, and close the incident with a resolved alert. Seven new tests cover that path and the refusals (no token, wrong token, rollback, oversize payload). All 396 tests pass, the style and type checks are clean, and every scored check is unchanged: scenarios 5 of 5, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10 — 0 unsafe actions.
+- Honest limit, stated plainly: this is a mode, not a deployment. There is no public URL yet, no host has been chosen, and nothing has been paid for. Those are the next Phase 10 steps, and the host and any cost will be named here before anything is paid for.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 12 November 2026 (later) — verification pass: everything still passes, and the public copy agrees in full
 
 - A check at the start of this pass found the public copy at the single commit that carried the last pass's Phase 9 work, and reading the nine changed files back showed each one matching the local copy exactly. Nothing is waiting to upload.
