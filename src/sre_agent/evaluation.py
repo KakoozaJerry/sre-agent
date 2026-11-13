@@ -39,6 +39,14 @@ each one seeds the in-memory tool backends the loop already
 reads, so the whole suite runs in pytest and in CI with no
 setup. Wiring the same faults through the Compose demo is
 later work and is not claimed here.
+
+The suite can run with any diagnosis backend: with none given
+it uses the deterministic backend, as it always has, and every
+report names the backend that earned its scores
+(``backend_name``). Scores for different backends are never
+blended — ``backend_scores.py`` runs this suite, the
+regression gate and the prompt-injection set once per backend
+and publishes each backend's scores separately.
 """
 
 from __future__ import annotations
@@ -48,6 +56,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 
 from .logging_config import get_logger
+from .model_backend import DiagnosisBackend
 from .models import Incident, Target
 from .reasoning import DiagnosisOutcome, ReasoningLoop
 from .tools import (
@@ -109,11 +118,15 @@ class EvaluationReport(BaseModel):
     correct: int = 0
     accuracy: float = 0.0
     unsafe_actions: int = 0
+    # Which backend earned these scores. Scores are published
+    # per backend, never blended (see backend_scores.py).
+    backend_name: str = "deterministic"
 
     def render_text(self) -> str:
         """The scores as plain text, limitations included."""
         lines = [
             "Evaluation: chaos scenario suite (seeded demo telemetry, no live system)",
+            f"Backend: {self.backend_name}",
             f"Scenarios: {self.total}  Correct diagnoses: {self.correct}  Accuracy: {self.accuracy:.0%}",
             f"Unsafe actions across the suite: {self.unsafe_actions} (counted from incident records)",
         ]
@@ -289,13 +302,21 @@ def _tool_layer_for(scenario: Scenario) -> ToolLayer:
     return ToolLayer(metrics=metrics, logs=logs, services=services)
 
 
-def run_scenario(scenario: Scenario) -> ScenarioResult:
-    """Run the reasoning loop on one scenario and score its answer."""
+def run_scenario(
+    scenario: Scenario, backend: DiagnosisBackend | None = None
+) -> ScenarioResult:
+    """Run the reasoning loop on one scenario and score its answer.
+
+    With no backend given the loop uses the deterministic
+    backend, as it always has.
+    """
     incident = Incident(
         title=f"{scenario.title} on {scenario.target.service}",
         target=scenario.target,
     )
-    report = ReasoningLoop(_tool_layer_for(scenario)).diagnose(incident)
+    report = ReasoningLoop(
+        _tool_layer_for(scenario), backend=backend
+    ).diagnose(incident)
 
     outcome_correct = report.outcome is scenario.expected_outcome
     top = report.hypotheses[0] if report.hypotheses else None
@@ -341,10 +362,15 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
 
 def run_evaluation(
     scenarios: list[Scenario] | None = None,
+    backend: DiagnosisBackend | None = None,
 ) -> EvaluationReport:
-    """Run the whole suite and return its scored report."""
+    """Run the whole suite and return its scored report.
+
+    The report names the backend that earned the scores, so a
+    score can always be tied to the backend that produced it.
+    """
     suite = scenarios if scenarios is not None else default_scenarios()
-    results = [run_scenario(scenario) for scenario in suite]
+    results = [run_scenario(scenario, backend=backend) for scenario in suite]
     correct = sum(1 for r in results if r.diagnosis_correct)
     total = len(results)
     report = EvaluationReport(
@@ -353,9 +379,11 @@ def run_evaluation(
         correct=correct,
         accuracy=(correct / total) if total else 0.0,
         unsafe_actions=sum(r.unsafe_actions for r in results),
+        backend_name=backend.name if backend is not None else "deterministic",
     )
     log.info(
-        "evaluation: %d/%d correct, %d unsafe action(s)",
+        "evaluation (%s): %d/%d correct, %d unsafe action(s)",
+        report.backend_name,
         correct,
         total,
         report.unsafe_actions,

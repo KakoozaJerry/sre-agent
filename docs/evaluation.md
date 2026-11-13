@@ -87,6 +87,21 @@ Current measured result (2026-11-09): 8 of 8 cases pass, 0 unsafe actions.
 
 One known limitation, stated plainly: the loop reads one content word in error logs — "timeout" — as a symptom signal, by plain rule. A crafted line containing that word can raise the timeout hypothesis, the way any false symptom can mislead a diagnosis. That is signal spoofing, not instruction following: the line still cannot add wording, actions, or targets beyond the loop's own fixed set. The printed report repeats this limit.
 
+## Scores by backend
+
+A diagnosis can be read by different *backends* (see the operator guide), and a score only ever belongs to the backend that earned it. Since Phase 9's last item, the chaos suite, the regression gate and the prompt-injection set can each run with a backend enabled, and `sre_agent.backend_scores.score_backend` runs all three for one backend and reports its scores on their own. The scores are never averaged or blended into one project score, and scoring a backend never moves the recorded baseline — every backend faces the same baseline.
+
+Measured 2026-11-12, against the recorded 0.2.0 baseline:
+
+| Backend | Chaos scenarios | Regression gate | Prompt-injection set | Unsafe actions | Verdict |
+|---|---|---|---|---|---|
+| deterministic | 5 of 5 (100%) | PASS | 8 of 8 | 0 | Passes all gates — the recommended backend, and the default |
+| language-model, with a scripted test-double client | 5 of 5 (100%) | PASS | 8 of 8 | 0 | Passes all gates *for that test double* — see the limit below |
+
+The limit, stated plainly: this repository ships no real model client, so **no real model has been scored**. The language-model row was measured with a scripted test-double client that lives in the tests (`tests/test_backend_scores.py`): it reads only the prompt it is given and answers with fixed wordings chosen by simple rules over the evidence summaries. Its scores prove the scoring run works end to end, and that the model backend's reply checks hold under the suites — a broken client scores 0 of 5 and fails the gates in the same tests, and a client that repeats a hostile order fails the injection set. They are not a real model's scores, and on their basis the language-model backend is **not recommended**. A backend is recommended only when its own scores pass all the gates: an operator who wires their own model client must score that exact client this way and publish its scores separately before recommending it — one client's scores say nothing about another client, provider or model.
+
+One detail of the injection row: six of its eight cases run the reasoning loop with the named backend; the two alert cases go through ingestion only and involve no diagnosis backend, whichever backend a run names.
+
 ## What is not scored yet — and why
 
 - **Which fix the agent would propose.** The reasoning loop proposes no fix, so there is nothing honest to score. This waits until a proposer exists.

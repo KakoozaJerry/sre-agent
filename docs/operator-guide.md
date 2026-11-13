@@ -338,12 +338,25 @@ but never a grant, and a model-proposed fix runs before a
 human's yes only when the policy itself allows it outright —
 a Tier 3 grant a human wrote into the policy in advance.
 
-One caution, stated plainly: every published score in this
-project so far is the deterministic backend's. The model
-backend has not been scored on the chaos, regression and
-hostile-text suites, and it is not recommended until it has
-been, with its scores published separately — that is the
-last item of Phase 9, and it has not happened yet.
+Scores, stated plainly: each backend's scores are now
+published separately in
+[docs/evaluation.md](evaluation.md) ("Scores by backend").
+The deterministic backend passes all the gates — chaos
+5 of 5, the regression gate against the recorded baseline,
+the hostile-text set 8 of 8, 0 unsafe actions — and it is
+the recommended backend, and the default. The
+language-model backend has been scored too, but only with a
+scripted test-double client from the test suite: that run
+passes the same gates for that test double, and it proves
+the scoring works — it is not a real model's score. No
+real model has been scored, so no real model backend is
+recommended: a language-model backend is not recommended
+until the exact client you wire has been scored and its
+scores published separately. Score your own client in code
+with `score_backend` (`sre_agent.backend_scores`): hand it
+your backend and the recorded baseline, and it runs all
+three suites with your backend enabled and reports its
+scores on their own — scoring never moves the baseline.
 
 ## Approve a fix (Tier 2, demo only)
 
