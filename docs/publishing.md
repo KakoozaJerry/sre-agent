@@ -1,19 +1,22 @@
 # Publishing a release — in plain English
 
 Phase 11's last item is real distribution: this project on
-PyPI, so a user can run `pipx install sreagent`, and the demo
-image on GHCR (GitHub's container registry). The package
-itself is ready — the name Abraham chose is `sreagent`, the
-metadata is complete and proven in a built wheel, and the
-release workflow is prepared. What is left is a short set of
-maintainer steps, because publishing needs Abraham's own
-PyPI account and one workflow file placed on the GitHub
+PyPI, so a user can run `pipx install sre-agent-cli`, and the
+demo image on GHCR (GitHub's container registry). The package
+itself is ready — the name Abraham chose is `sre-agent-cli`,
+the metadata is complete and proven in a built wheel, and
+the release workflow is prepared. (His first choice,
+`sreagent`, read as free on PyPI and PyPI refused it anyway,
+as too similar to the taken `sre-agent`; that refusal is why
+the name carries the `-cli` ending.) What is left is a short
+set of maintainer steps, because publishing needs Abraham's
+own PyPI account and one workflow file placed on the GitHub
 website. This page is those steps, in order, with the checks
 that prove each one worked.
 
 Nothing here has been published yet. As of 13 November 2026,
-PyPI returns 404 for `sreagent` (the name is free, not taken),
-and GHCR shows no public image for this project.
+PyPI returns 404 for `sre-agent-cli` (the name is free, not
+taken), and GHCR shows no public image for this project.
 
 ## How publishing is meant to work
 
@@ -27,7 +30,7 @@ and GHCR shows no public image for this project.
   token and no password stored in this repository, and none
   must ever be added. Instead, PyPI is told in advance which
   repository and which workflow file may publish the
-  `sreagent` project, and GitHub proves the workflow's
+  `sre-agent-cli` project, and GitHub proves the workflow's
   identity with a short-lived OpenID Connect token
   (`id-token: write`) when it runs.
 - **GHCR uses the workflow's own GitHub token.** The job
@@ -53,7 +56,7 @@ On pypi.org, signed in as the maintainer:
 2. Fill it in with exactly these values. A different
    workflow filename or environment name makes the first
    publish fail, because PyPI checks them word for word:
-   - PyPI Project Name: `sreagent`
+   - PyPI Project Name: `sre-agent-cli`
    - Owner: `KakoozaJerry`
    - Repository name: `sre-agent`
    - Workflow filename: `publish.yml`
@@ -101,12 +104,12 @@ with the project, alongside its tests
 Do not take the workflow's green tick as the proof. Check
 the registries themselves:
 
-- PyPI: `https://pypi.org/pypi/sreagent/json` answers 200
-  (today it answers 404), and the project page
-  `https://pypi.org/project/sreagent/` shows version 0.2.0
-  with the metadata from `pyproject.toml`.
+- PyPI: `https://pypi.org/pypi/sre-agent-cli/json` answers
+  200 (today it answers 404), and the project page
+  `https://pypi.org/project/sre-agent-cli/` shows version
+  0.2.0 with the metadata from `pyproject.toml`.
 - A clean machine (or a fresh folder) runs
-  `pipx install sreagent`, and `sre-agent --version` then
+  `pipx install sre-agent-cli`, and `sre-agent --version` then
   prints `sre-agent 0.2.0`. The command a user runs is
   still called `sre-agent`; only the package name changed.
 - GHCR: the repository's Packages list shows

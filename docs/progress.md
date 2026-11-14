@@ -2,6 +2,15 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 11 continues) — the package is renamed again: `sre-agent-cli`
+
+- **PyPI refused the first chosen name, so the package has a new one.** When Abraham created the pending publisher on PyPI, it answered that `sreagent` is too similar to an existing project — the taken `sre-agent` it was meant to sit next to. A name can be free (nobody owns it) and still be refused at the moment it is claimed. Abraham chose `sre-agent-cli` instead and created the pending publisher under that name; this pass renamed the package everywhere to match: the project file, the README's install section, the publishing guide's exact values, and the held workflow's own pins.
+- **Only the distribution name changed — again.** The import package is still `sre_agent`, and the command a user runs is still `sre-agent`. The wheel built in this pass proves it: its inside record names `sre-agent-cli` with the `sre-agent` command unchanged, and the publisher's own checker (`twine check`) passed both the wheel and the source distribution.
+- **The README's warning still stands:** `pipx install sre-agent` installs Fuzzy Labs' agent, not this one. This project's future install is `pipx install sre-agent-cli`, and it does not work today, because nothing is published yet.
+- Everything else holds: all 438 tests pass, the style and type checks are clean, and every scored check is unchanged — scenarios 5 of 5, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions.
+- Still open in Phase 11: only the publication itself — Abraham places `publish.yml` and its tests on the website (they are still held locally, renamed and passing, and are not part of this pass's upload), runs the workflow once, and the read-backs close the item.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 13 November 2026 (Phase 11 continues) — a stranded batch is found and carried, and the held package is still ready
 
 - **This pass changed no code. Its first job was bookkeeping honesty: the last pass's own batch never landed.** At this pass's start the public head was still 4f87360, the commit from the pass before last, and two files — this log and the plan — read back different from the local copy. Those differences are exactly the last pass's entries, present locally only. The other files checked (the publishing guide and the README) agree word for word, so exactly two files were stranded, not the whole tree. This pass's batch carries both passes' bookkeeping together.

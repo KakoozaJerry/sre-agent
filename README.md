@@ -160,17 +160,21 @@ PyPI on 13 November 2026: versions 0.1.0 to 0.2.1). That
 command works today — and installs their agent, not this
 one.
 
-**This project's chosen PyPI name is `sreagent`.** It was
-checked free on PyPI on 13 November 2026, and the package
-in `pyproject.toml` now carries that name. When this
-project is published, the user install will be
-`pipx install sreagent` — and the command it installs is
-still called `sre-agent`, because the distribution name,
-the import package (`sre_agent`) and the command name are
-three different things, and only the first one changed.
+**This project's chosen PyPI name is `sre-agent-cli`.**
+The first choice, `sreagent`, read as free on PyPI — and
+PyPI refused it anyway when the maintainer set up
+publishing, as too similar to the taken `sre-agent` above.
+`sre-agent-cli` was chosen instead, and the package in
+`pyproject.toml` now carries that name. When this project
+is published, the user install will be
+`pipx install sre-agent-cli` — and the command it installs
+is still called `sre-agent`, because the distribution
+name, the import package (`sre_agent`) and the command
+name are three different things, and only the first one
+changed.
 
 That publication has not happened yet, so
-`pipx install sreagent` does not work today either.
+`pipx install sre-agent-cli` does not work today either.
 Until a release announces the publication, the quickstart
 from source above is the only install path, and the hosted
 demo needs no install at all. Publishing to PyPI, and

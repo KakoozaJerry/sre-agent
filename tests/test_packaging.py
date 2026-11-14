@@ -4,9 +4,10 @@ The metadata in ``pyproject.toml`` is what PyPI will show
 when the package is published. These tests pin the facts —
 URLs, keywords, classifiers — so a later edit cannot drop
 them quietly, pin the distribution name Abraham chose
-(``sreagent``, 2026-11-13), and pin the README's honest
-warning that the PyPI name sre-agent already belongs to a
-different project.
+(``sre-agent-cli``, 2026-11-13 — after PyPI refused his
+first choice, ``sreagent``, as too similar to the taken
+name), and pin the README's honest warning that the PyPI
+name sre-agent already belongs to a different project.
 """
 
 from __future__ import annotations
@@ -52,11 +53,12 @@ def test_requires_python_matches_the_classifier_floor() -> None:
     assert project["requires-python"] == ">=3.11"
 
 
-def test_distribution_name_is_the_chosen_sreagent() -> None:
-    # Abraham chose ``sreagent`` on 2026-11-13, after ``sre-agent``
-    # was read back on PyPI as a different project (Fuzzy Labs).
-    # ``sreagent`` was checked free on PyPI that day (404).
-    assert _project()["name"] == "sreagent"
+def test_distribution_name_is_the_chosen_sre_agent_cli() -> None:
+    # Abraham chose ``sre-agent-cli`` on 2026-11-13, after
+    # ``sre-agent`` was read back on PyPI as a different project
+    # (Fuzzy Labs) and PyPI refused his first replacement,
+    # ``sreagent``, as too similar to that taken name.
+    assert _project()["name"] == "sre-agent-cli"
 
 
 def test_command_and_import_names_are_unchanged_by_the_rename() -> None:
@@ -79,8 +81,8 @@ def test_readme_names_the_chosen_name_and_warns_about_the_taken_one() -> None:
     assert "Fuzzy Labs" in flat
     # The chosen name, and the future user install under it,
     # with the command name stated as unchanged.
-    assert "chosen PyPI name is `sreagent`" in flat
-    assert "`pipx install sreagent`" in flat
+    assert "chosen PyPI name is `sre-agent-cli`" in flat
+    assert "`pipx install sre-agent-cli`" in flat
     assert "still called `sre-agent`" in flat
     # Not published under either name yet.
     assert "no install of this project from PyPI yet" in flat
