@@ -255,10 +255,10 @@ nothing outside its own process:
 | `sre-agent demo adapters` | The Kubernetes, Datadog and Azure Monitor read adapters on demo data |
 | `sre-agent check security` | The ten security probes, plus the findings they cannot prove away (exits 1 if any probe fails) |
 
-The old names above still work as aliases for one release and run exactly the same code.
+The old names still work as aliases for one release and run exactly the same code.
 
-Run the four checks — `evaluate`, `regression-check`,
-`injection-check`, `tier3-check`, plus `security-check` — after
+Run the checks — `check evaluate`, `check regression`,
+`check injection`, `check tier3`, plus `check security` — after
 any change, before you trust the build again. They are quick,
 and together they are the measured answer to "is it still
 safe?".

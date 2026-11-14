@@ -2,6 +2,15 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 14 November 2026 (Phase 12 — three contributor pull requests merged) — the merged code is synced and every check still passes
+
+- **Three of the four starter-issue pull requests are now merged.** Abraham merged them in the main chat at 20:49 UTC: #5 leads the operator guide's command table with the grouped names, #8 redacts Azure `AccountKey` values in tool output, and #7 adds the TLS certificate case to the proposal-selection suite. Issues #1, #2 and #4 are closed. Pull request #6 — the proposal-selection CLI check, for issue #3 — is still open; merging it belongs to that same main-chat process, and this pass merged nothing.
+- **The local copy now matches the merged code.** Six files differed from the public copies and were brought in and read diff by diff: exactly the three pull requests' changes and nothing else. The plan and this log already matched the public copies, so the previous pass's batch did land.
+- **Everything was checked again from a clean copy.** 472 tests pass (470 before, plus the two new AccountKey tests), the style and type checks are clean, and every scored check holds: scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, and the proposal-selection suite is now 9 of 9 — with 0 unsafe actions.
+- **One small wording fix came with this pass.** The merged operator guide's table now shows the grouped names, so its sentence about "the old names above" did not fit anymore; it now simply says the old names still work as aliases. The line below it, which told readers to run "the four checks" and then listed five old names, now names the five grouped check commands.
+- **What is left is unchanged, and both parts need Abraham.** Discussions is still not enabled (its address still answers 404; the step is Settings, then Features, then Discussions on the website), and the real-model backend score still needs an operator-supplied key with the exact client named. The hosted demo is healthy (health check ok, front page 200).
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 14 November 2026 (Phase 12 — fifth verification pass) — the last batch was stranded again and is carried; the pull-request merges belong to another process
 
 - **The previous pass's push did not land, proved the plain way again.** The public head is still f4873d7, its push card is recorded as timed out, and the public plan and progress log differ from the local copies by exactly the last pass's entries and nothing else. This pass's batch carries those entries together with its own, and is judged only by reading the public copy back afterwards.
