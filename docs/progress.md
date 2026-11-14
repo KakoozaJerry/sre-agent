@@ -2,6 +2,15 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 13 November 2026 (Phase 11 is complete) — the package is published, and read back
+
+- **The first publish run worked.** Abraham placed `publish.yml` and its tests on the website himself (the connection cannot write workflow files), then ran the Publish workflow by hand. Both jobs succeeded: PyPI by trusted publishing, with no token stored anywhere, and the demo image to GHCR.
+- **The registries themselves were read back — not the workflow's green tick.** PyPI answers 200 for `sre-agent-cli` and shows version 0.2.0, with the wheel and the source distribution uploaded on 13 November 2026. A clean install in a fresh folder (`pip install sre-agent-cli==0.2.0`) then ran `sre-agent --version` and printed `sre-agent 0.2.0` — the command name is unchanged, as promised. GHCR shows the public `sre-agent-demo` image for this repository.
+- **One honest detail:** that first run was a manual run on `main`, so the GHCR image carries the tags `main` and `sha-7f49929`, not a `0.2.0` tag. Version tags come from release-triggered runs, whose event carries the tag. The publishing guide now says exactly that.
+- **The words caught up with the facts.** The README's install section now gives `pipx install sre-agent-cli` as the user install (and keeps the warning that `pipx install sre-agent` installs Fuzzy Labs' agent), the publishing guide records the completed first publication and its read-backs, and the packaging tests that pinned the old "not published yet" sentence now pin the published wording instead. The Phase 11 distribution item is checked off — Phase 11 is complete. What remains is Phase 12, in Abraham's order: grow the scenario suite first.
+- Everything else holds: all 438 tests pass, the style and type checks are clean, every scored check is unchanged — scenarios 5 of 5, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, 0 unsafe actions — and the hosted demo answered its health check from outside.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 13 November 2026 (Phase 11 continues) — the package is renamed again: `sre-agent-cli`
 
 - **PyPI refused the first chosen name, so the package has a new one.** When Abraham created the pending publisher on PyPI, it answered that `sreagent` is too similar to an existing project — the taken `sre-agent` it was meant to sit next to. A name can be free (nobody owns it) and still be refused at the moment it is claimed. Abraham chose `sre-agent-cli` instead and created the pending publisher under that name; this pass renamed the package everywhere to match: the project file, the README's install section, the publishing guide's exact values, and the held workflow's own pins.

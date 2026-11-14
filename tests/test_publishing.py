@@ -88,7 +88,7 @@ def test_publishing_guide_ends_in_read_backs_not_a_green_tick() -> None:
         "https://pypi.org/pypi/sre-agent-cli/json",
         "`pipx install sre-agent-cli`",
         "`sre-agent --version`",
-        "docker pull ghcr.io/kakoozajerry/sre-agent-demo:0.2.0",
+        "docker pull ghcr.io/kakoozajerry/sre-agent-demo:main",
         "visibility to public",
     ):
         assert needle in flat

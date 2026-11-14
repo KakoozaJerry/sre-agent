@@ -150,8 +150,10 @@ For development (the test tools as well), install
 ### Installing as a user, not a contributor
 
 The quickstart above is the contributor path: it installs
-from a clone of this repository. There is no install of
-this project from PyPI yet — and two names matter here:
+from a clone of this repository. This project is also
+published on PyPI (version 0.2.0, published on
+13 November 2026 and read back from PyPI itself) — and
+two names matter here:
 
 **Do not run `pipx install sre-agent` expecting this
 project.** The name `sre-agent` on PyPI already belongs to
@@ -165,22 +167,20 @@ The first choice, `sreagent`, read as free on PyPI — and
 PyPI refused it anyway when the maintainer set up
 publishing, as too similar to the taken `sre-agent` above.
 `sre-agent-cli` was chosen instead, and the package in
-`pyproject.toml` now carries that name. When this project
-is published, the user install will be
+`pyproject.toml` carries that name. The user install is
 `pipx install sre-agent-cli` — and the command it installs
 is still called `sre-agent`, because the distribution
 name, the import package (`sre_agent`) and the command
 name are three different things, and only the first one
 changed.
 
-That publication has not happened yet, so
-`pipx install sre-agent-cli` does not work today either.
-Until a release announces the publication, the quickstart
-from source above is the only install path, and the hosted
-demo needs no install at all. Publishing to PyPI, and
-publishing the demo image to GHCR, are release steps that
-need the maintainer's PyPI and GitHub settings, in the
-same way creating a GitHub Release does.
+The demo image is published to GHCR as
+`ghcr.io/kakoozajerry/sre-agent-demo` (tags `main` and the
+build's commit tag from the first publish run; a version
+tag is added by release-triggered runs). The hosted demo
+needs no install at all. How publishing works, and the
+read-backs that proved the first publication, are in
+[docs/publishing.md](docs/publishing.md).
 
 ## Walkthrough: one alert, end to end
 

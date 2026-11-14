@@ -14,9 +14,20 @@ own PyPI account and one workflow file placed on the GitHub
 website. This page is those steps, in order, with the checks
 that prove each one worked.
 
-Nothing here has been published yet. As of 13 November 2026,
-PyPI returns 404 for `sre-agent-cli` (the name is free, not
-taken), and GHCR shows no public image for this project.
+**First publication — done, and read back.** On
+13 November 2026 the maintainer placed the workflow and
+its tests on the website, ran the Publish workflow by
+hand, and both jobs succeeded. The read-backs in Step 4
+were then done from the registries themselves: PyPI
+answers 200 for `sre-agent-cli` and shows version 0.2.0
+(wheel and source distribution), a clean install of
+`sre-agent-cli` 0.2.0 prints `sre-agent 0.2.0`, and GHCR
+shows the public `sre-agent-demo` image. One honest
+detail: that first run was a manual run on `main`, so the
+image carries the tags `main` and `sha-7f49929`, not a
+version tag — version tags come from release-triggered
+runs, whose event carries the tag. The steps below stay
+as the guide for every later release.
 
 ## How publishing is meant to work
 
@@ -105,21 +116,26 @@ Do not take the workflow's green tick as the proof. Check
 the registries themselves:
 
 - PyPI: `https://pypi.org/pypi/sre-agent-cli/json` answers
-  200 (today it answers 404), and the project page
+  200, and the project page
   `https://pypi.org/project/sre-agent-cli/` shows version
   0.2.0 with the metadata from `pyproject.toml`.
+  (For the first publication this read 200 with the wheel
+  and source distribution uploaded on 13 November 2026.)
 - A clean machine (or a fresh folder) runs
   `pipx install sre-agent-cli`, and `sre-agent --version` then
   prints `sre-agent 0.2.0`. The command a user runs is
   still called `sre-agent`; only the package name changed.
+  (For the first publication a clean `pip install
+  sre-agent-cli` was used for the same check, with the
+  same result.)
 - GHCR: the repository's Packages list shows
   `sre-agent-demo`, and `docker pull
-  ghcr.io/kakoozajerry/sre-agent-demo:0.2.0` works. A newly
+  ghcr.io/kakoozajerry/sre-agent-demo:main` works. A newly
   published GHCR package starts private: in the package's
   settings, set its visibility to public and link it to
   the `sre-agent` repository, or no visitor can pull it.
 - Only then is the roadmap's distribution item done, and
   only then may the README's install section drop its
   "not published yet" sentence — the packaging tests pin
-  that sentence today, and they change in the same commit
-  that the read-back earns.
+  that sentence, and they changed in the same pass that
+  the read-back earned (13 November 2026).

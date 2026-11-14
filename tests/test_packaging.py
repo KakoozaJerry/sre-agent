@@ -79,13 +79,16 @@ def test_readme_names_the_chosen_name_and_warns_about_the_taken_one() -> None:
     assert "Do not run `pipx install sre-agent` expecting this project" in flat
     assert "already belongs to a different SRE agent" in flat
     assert "Fuzzy Labs" in flat
-    # The chosen name, and the future user install under it,
+    # The chosen name, and the user install under it,
     # with the command name stated as unchanged.
     assert "chosen PyPI name is `sre-agent-cli`" in flat
     assert "`pipx install sre-agent-cli`" in flat
     assert "still called `sre-agent`" in flat
-    # Not published under either name yet.
-    assert "no install of this project from PyPI yet" in flat
-    assert "not on PyPI yet" not in flat
-    # The contributor quickstart stays the install path today.
+    # Published under the chosen name, read back from PyPI
+    # on 2026-11-13 (version 0.2.0); the stale not-published
+    # wording must not come back.
+    assert "published on PyPI" in flat
+    assert "no install of this project from PyPI yet" not in flat
+    assert "does not work today either" not in flat
+    # The contributor quickstart stays in place alongside it.
     assert "./quickstart.sh" in readme
