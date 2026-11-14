@@ -2,6 +2,16 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 14 November 2026 (Phase 12 — second verification pass) — the blockers are unchanged a second pass in a row, and that is a stable waiting state
+
+- **The previous pass's push is confirmed landed, again by reading it back.** The public head is 6947e56, the commit the last pass claimed, and the plan and this progress log read back matching the local copy exactly. Nothing was stranded, so nothing needed carrying.
+- **No new roadmap item was completed in this pass, stated plainly, for the second pass in a row.** Only two items in Phase 12 are still unchecked, and each still waits on one human-supplied step and nothing else: the bigger scenario suite waits on a real-model score, which needs an operator-supplied key and the exact client named (no key was supplied, and no real model was called); and the starter-issues item waits on Discussions, which is still not enabled — its address still answers 404, and it is a website setting (Settings, then Features, then Discussions) that the GitHub connection cannot change.
+- **A blocker that repeats unchanged is a waiting state, not a new problem.** That is this pass's lesson, now written into the plan: keep re-checking the two steps each pass because either could change, but do not escalate the wording, report them as if they were new, or invent work around them. The starter issues were read back still open, each labelled "good first issue", and were again not done here on purpose — finishing them would remove the contributor on-ramps they exist to create.
+- **The hosted demo is healthy.** Its health check answered ok and its front page answered 200 in this pass.
+- Everything verified from a clean copy in full: the quickstart passed, the dev tools installed into the same folder (the canonical setup from the contributing guide), 470 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 8 of 8, 0 unsafe actions.
+- **What remains in Phase 12:** the same two human steps — Abraham enabling Discussions on the website, and an operator-supplied key for one real-model score. Everything that can be built and verified in the repo or through the connection is done.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 14 November 2026 (Phase 12 — verification pass) — the last batch is confirmed landed, and both remaining items wait only on human steps
 
 - **The previous pass's push is now confirmed, not pending.** Its log entry left the read-back of its four-file batch as still to be confirmed. This pass read the public copy back in full: the public head is the batch commit it claimed, and every file checked — the contributing guide, the docs tests, this progress log, the plan, the README, the security policy and the hosted-demo guide — matches the local copy exactly. Nothing was stranded, so nothing needed carrying.
