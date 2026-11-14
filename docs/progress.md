@@ -2,6 +2,22 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 14 November 2026 (Phase 12 — fifth verification pass) — the last batch was stranded again and is carried; the pull-request merges belong to another process
+
+- **The previous pass's push did not land, proved the plain way again.** The public head is still f4873d7, its push card is recorded as timed out, and the public plan and progress log differ from the local copies by exactly the last pass's entries and nothing else. This pass's batch carries those entries together with its own, and is judged only by reading the public copy back afterwards.
+- **The pull requests were left alone on purpose in this pass.** All four (#5–#8) and their issues (#1–#4) are still open, and two merge cards for #5 from the main chat — where Abraham directed the judging by review risk — stood pending at this pass's check. That process owns merging; acting here as well would risk racing it.
+- **Nothing else changed.** Discussions still answers 404 (Abraham's website step: Settings, then Features, then Discussions), and the real-model score still needs an operator-supplied key and the exact client named. The hosted demo is healthy (health check ok, front page 200).
+- Everything verified from a clean copy in full: 470 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 8 of 8, 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+## 14 November 2026 (Phase 12 — contributor pull requests verified) — four starter-issue pull requests pass every check; merging them is the maintainer's call
+
+- **The starter issues worked: a first-time contributor answered them.** dbdefault opened four pull requests, one for each good-first-issue — #8 redacts Azure `AccountKey` values, #7 adds the TLS proposal-selection case, #6 adds the proposal-selection CLI check, #5 leads the operator guide's table with the grouped names. Each pull request said plainly that the full test suite had not run in the contributor's environment, so this pass ran it for them.
+- **All four pass, together and apart.** Each pull request's own tests pass in its own tree. Applied together on top of the current main line: 474 tests pass, the style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10 — with the proposal-selection suite now at 9 of 9, run through the new `sre-agent check proposal` command the third pull request adds. Main itself was re-verified from a clean copy first: 470 tests, all gates as shipped.
+- **Two small catches, found by reading rather than by tests.** If pull requests #6 and #7 are merged in either order, the evaluation page ends up saying there is no CLI command for the proposal suite — one pull request's version of that page overwrites the other's fix, and no test notices; it is a one-line repair at merge time. And #5's sentence about the old names says "above" over a table that now shows the new names, while one later paragraph still lists the old check names.
+- **Nothing was merged in this pass.** Merging a first-time contributor's work is Abraham's decision; the four issues stay open until then. The two remaining roadmap items are unchanged: Discussions is still not enabled (Abraham's website step: Settings, then Features, then Discussions), and the real-model score still needs an operator-supplied key and the exact client named. The hosted demo is healthy (health check ok, front page 200).
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 14 November 2026 (Phase 12 — fourth verification pass) — the last batch was stranded and is carried; the waiting state is unchanged
 
 - **The previous pass's push did not land, and this pass proves it the plain way.** The public head is still c902f44, no approval card is pending, and the public plan and progress log differ from the local copies by exactly the last pass's entries and nothing else — its push waited on a card that expired unanswered. This pass's batch carries those entries together with its own, and is judged only by reading the public copy back afterwards.
