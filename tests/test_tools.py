@@ -153,6 +153,30 @@ def test_redact_secrets_leaves_ordinary_text_alone():
         assert redact_secrets(text) == text
 
 
+def test_redact_secrets_hides_azure_account_key_values():
+    line = (
+        "DefaultEndpointsProtocol=https;AccountName=x;"
+        "AccountKey=abcDEF1234567890==;EndpointSuffix=core.windows.net"
+    )
+    assert redact_secrets(line) == (
+        "DefaultEndpointsProtocol=https;AccountName=x;"
+        "AccountKey=[redacted];EndpointSuffix=core.windows.net"
+    )
+    assert redact_secrets("AccountKey: abcDEF1234567890==") == (
+        "AccountKey: [redacted]"
+    )
+
+
+def test_redact_secrets_leaves_ordinary_account_key_text_alone():
+    ordinary = [
+        "rotate the account key count every 90 days",
+        "AccountKey is the name of the field",
+        "the account key was missing from the config",
+    ]
+    for text in ordinary:
+        assert redact_secrets(text) == text
+
+
 def test_log_search_redacts_secrets_in_returned_lines():
     logs = InMemoryLogsBackend(
         [
