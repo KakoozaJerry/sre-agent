@@ -169,7 +169,7 @@ def _workload(scenario: Scenario, *, previous: list[str] | None = None) -> Workl
 
 
 def default_proposal_cases() -> list[ProposalCase]:
-    """Eight cases over the chaos scenarios, by scenario id.
+    """Nine cases over the chaos scenarios, by scenario id.
 
     Each expected selection follows the selector's stated
     rules: three causes map to a runbook, the rest escalate.
@@ -224,6 +224,12 @@ def default_proposal_cases() -> list[ProposalCase]:
             id="rate-limit-escalates",
             scenario_id="rate-limited",
             workload=_workload(by_id["rate-limited"]),
+            expected_runbook=None,
+        ),
+        ProposalCase(
+            id="tls-certificate-escalates",
+            scenario_id="tls-certificate-error",
+            workload=_workload(by_id["tls-certificate-error"]),
             expected_runbook=None,
         ),
     ]

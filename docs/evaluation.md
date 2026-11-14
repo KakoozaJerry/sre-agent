@@ -53,7 +53,7 @@ Measured 2026-11-13 (Phase 12), on the current suite — not a release score: de
 
 Phase 12 also added a scored suite for the next step after a diagnosis: which fix the diagnosis points to. It lives in `sre_agent/proposal_selection.py` (library and tests; there is no CLI command for it yet). A small, conservative selector reads a diagnosis's top cause: a recent deploy with a previous version selects a rollback; missing copies select a scale back to the wanted count; a timeout, a crash loop, or a generic failure selects a restart; and every other named cause — a full disk, a bad configuration value, an upstream rate limit — selects *nothing*, because no runbook in the library fixes it, so the honest answer is to escalate. Choosing nothing is scored as an answer.
 
-Each of its eight cases first runs the real reasoning loop on a chaos scenario, so the selector is scored on diagnoses the loop actually produced. Measured 2026-11-13: **8 of 8 correct selections, 0 unsafe actions**. The selector is advice only, Tier 1 like a memory suggestion: it runs nothing, proposes nothing through the policy engine, and approves nothing, and it is not wired into the server or the CLI — it is scored first, before any wiring is considered.
+Each of its nine cases first runs the real reasoning loop on a chaos scenario, so the selector is scored on diagnoses the loop actually produced. Measured 2026-11-13: **9 of 9 correct selections, 0 unsafe actions**. The selector is advice only, Tier 1 like a memory suggestion: it runs nothing, proposes nothing through the policy engine, and approves nothing, and it is not wired into the server — it is scored first, before any wiring is considered.
 
 ## What is scored
 
