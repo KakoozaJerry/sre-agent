@@ -2,6 +2,22 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 14 November 2026 (Phase 12 — fourth verification pass) — the last batch was stranded and is carried; the waiting state is unchanged
+
+- **The previous pass's push did not land, and this pass proves it the plain way.** The public head is still c902f44, no approval card is pending, and the public plan and progress log differ from the local copies by exactly the last pass's entries and nothing else — its push waited on a card that expired unanswered. This pass's batch carries those entries together with its own, and is judged only by reading the public copy back afterwards.
+- **Nothing else changed.** Discussions still answers 404 (Abraham's website step: Settings, then Features, then Discussions), the real-model score still needs an operator-supplied key and the exact client named, and the four starter issues are still open, each labelled "good first issue" — again not done here on purpose.
+- **The hosted demo is healthy.** Its health check answered ok and its front page answered 200.
+- Everything verified from a clean copy in full: 470 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 8 of 8, 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+## 14 November 2026 (Phase 12 — third verification pass) — the waiting state is confirmed again, and the record is shorter because nothing changed
+
+- **The previous pass's push is confirmed landed.** The public head is c902f44, the commit the last pass claimed, and the plan and this progress log read back matching the local copy exactly. Nothing was stranded.
+- **No new roadmap item was completed.** The same two human steps remain: Discussions is still not enabled (its address still answers 404; it is Abraham's website step, Settings, then Features, then Discussions), and the real-model score still needs an operator-supplied key and the exact client named. The four starter issues are still open, each labelled "good first issue", and were not done here on purpose — finishing them would remove the contributor on-ramps they exist to create.
+- **The hosted demo is healthy.** Its health check answered ok and its front page answered 200.
+- Everything verified from a clean copy in full: 470 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 8 of 8, 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
 ## 14 November 2026 (Phase 12 — second verification pass) — the blockers are unchanged a second pass in a row, and that is a stable waiting state
 
 - **The previous pass's push is confirmed landed, again by reading it back.** The public head is 6947e56, the commit the last pass claimed, and the plan and this progress log read back matching the local copy exactly. Nothing was stranded, so nothing needed carrying.
