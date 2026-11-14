@@ -88,7 +88,7 @@ Severity is judged for the case that matters: the server, or a live backend, use
 
 ### F-05 — Low — Live backend addresses are caller-supplied, with no allow-list
 
-**Where:** the live backends in `tools.py` (Prometheus) and `adapters.py` (Kubernetes, Datadog, Azure), and the CLI's `--base-url` / `SRE_AGENT_BASE_URL`.
+**Where:** the live backends in `tools.py` (Prometheus) and the `adapters` package (Kubernetes, Datadog, Azure), and the CLI's `--base-url` / `SRE_AGENT_BASE_URL`.
 
 **What:** Each live backend takes a base URL from its caller and sends its credential to that address as a header. Today the caller is always operator code or configuration — never telemetry, never an alert, never a model output — so there is no injection path into the address. The risk is misdirection: a mistyped or maliciously set address would receive a live token, and plain `http://` addresses are accepted, so a token could cross a network unencrypted.
 

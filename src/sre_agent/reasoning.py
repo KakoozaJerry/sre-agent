@@ -31,7 +31,7 @@ How v1 works, honestly:
   plan finishes, the loop stops gathering and escalates.
 - **Selected adapters are extra steps, never a new plan.**
   An operator may select read adapters (Kubernetes, Datadog,
-  Azure Monitor — see ``adapters.py``) as extra evidence
+  Azure Monitor — see the ``adapters`` package) as extra evidence
   sources. Each selected adapter is asked exactly one fixed
   question, after the four core questions, and counts as one
   more step. Adapter questions are built only from the

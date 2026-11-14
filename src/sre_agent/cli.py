@@ -117,7 +117,7 @@ the policy engine, and approves nothing. Memory is not wired
 into the live server or the reasoning loop yet.
 
 ``adapters-demo`` runs the three read adapters locally on
-seeded demo data (see adapters.py): the Kubernetes pod listing
+seeded demo data (see the adapters package): the Kubernetes pod listing
 for the demo checkout workload, a Datadog metrics query, and an
 Azure Monitor KQL query. Every adapter only looks — nothing is
 changed in any system — and no live cluster, Datadog account or

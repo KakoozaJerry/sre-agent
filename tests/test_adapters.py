@@ -234,3 +234,30 @@ def test_cli_adapters_demo_prints_report_and_exits_zero(capsys) -> None:  # type
 def test_cli_adapters_demo_rejects_extra_arguments(capsys) -> None:  # type: ignore[no-untyped-def]
     assert main(["adapters-demo", "extra"]) == 1
     assert "no extra arguments" in capsys.readouterr().err
+
+
+# --- Phase 12 restructure: one module per backend, same import path ---------
+
+
+def test_adapters_is_a_package_split_per_backend() -> None:
+    import sre_agent.adapters as adapters_pkg
+
+    assert hasattr(adapters_pkg, "__path__")  # a package, not one module
+
+
+def test_each_backend_lives_in_its_own_module() -> None:
+    from sre_agent.adapters import azure, datadog, kubernetes, sources
+
+    assert kubernetes.KubernetesReader is KubernetesReader
+    assert datadog.DatadogAdapter is DatadogAdapter
+    assert azure.AzureAdapter is AzureAdapter
+    assert sources.demo_adapters is demo_adapters
+
+
+def test_package_imports_are_the_same_objects_as_the_backend_modules() -> None:
+    import sre_agent.adapters as adapters_pkg
+    from sre_agent.adapters import azure, datadog, kubernetes
+
+    assert adapters_pkg.parse_kubernetes_pods is kubernetes.parse_kubernetes_pods
+    assert adapters_pkg.parse_datadog_response is datadog.parse_datadog_response
+    assert adapters_pkg.parse_azure_response is azure.parse_azure_response
