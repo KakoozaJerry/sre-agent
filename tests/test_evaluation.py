@@ -1,8 +1,10 @@
-"""Tests for the evaluation harness: five chaos scenarios, scored.
+"""Tests for the evaluation harness: eighteen chaos scenarios, scored.
 
 The suite's job is to measure, not to flatter: these tests pin
-the five named faults, the scoring rules, the safety count, and
-the stated limits (no remediation or wall-clock scoring yet).
+the eighteen named faults, the distinct top cause each one
+expects, the scoring rules, the safety count, and the stated
+limits (proposal selection is scored separately, and there is
+no wall-clock scoring).
 """
 
 from __future__ import annotations
@@ -15,22 +17,50 @@ from sre_agent.evaluation import (
 )
 from sre_agent.reasoning import DiagnosisOutcome
 
+EXPECTED_IDS = [
+    "pod-kill",
+    "latency-injection",
+    "bad-deploy",
+    "disk-fill",
+    "config-error",
+    "oom-kill",
+    "connection-refused",
+    "dns-failure",
+    "tls-certificate-error",
+    "database-deadlock",
+    "connection-pool-exhausted",
+    "rate-limited",
+    "auth-permission-error",
+    "image-pull-failure",
+    "crash-loop",
+    "queue-backlog",
+    "dependency-unavailable",
+    "generic-error-rate",
+]
 
-def test_suite_has_the_five_named_faults() -> None:
+
+def test_suite_has_the_eighteen_named_faults() -> None:
     ids = [s.id for s in default_scenarios()]
-    assert ids == [
-        "pod-kill",
-        "latency-injection",
-        "bad-deploy",
-        "disk-fill",
-        "config-error",
+    assert ids == EXPECTED_IDS
+
+
+def test_every_scenario_expects_a_distinct_top_cause() -> None:
+    # Phase 12's rule: no two scenarios share an expected cause,
+    # and the specific cause is scored in every scenario.
+    expected = [
+        s.expected_top_hypothesis_contains for s in default_scenarios()
     ]
+    assert all(e is not None for e in expected)
+    lowered = [str(e).lower() for e in expected]
+    assert len(set(lowered)) == len(lowered) == 18
+    tops = [r.top_hypothesis for r in run_evaluation().results]
+    assert len({str(t).lower() for t in tops}) == 18
 
 
-def test_all_five_scenarios_score_correct_with_current_loop() -> None:
+def test_all_eighteen_scenarios_score_correct_with_current_loop() -> None:
     report = run_evaluation()
-    assert report.total == 5
-    assert report.correct == 5
+    assert report.total == 18
+    assert report.correct == 18
     assert report.accuracy == 1.0
     for result in report.results:
         assert result.outcome_correct, result.scenario_id
@@ -69,10 +99,20 @@ def test_pod_kill_scenario_names_missing_copies() -> None:
     assert result.steps_used == 4
 
 
+def test_specific_causes_are_named_from_log_wording() -> None:
+    by_id = {r.scenario_id: r for r in run_evaluation().results}
+    # Phase 12: disk, config and deploy are now scored on their
+    # specific cause, named from the error logs' own wording.
+    assert "disk" in str(by_id["disk-fill"].top_hypothesis).lower()
+    assert "configuration" in str(by_id["config-error"].top_hypothesis).lower()
+    assert "deploy" in str(by_id["bad-deploy"].top_hypothesis).lower()
+
+
 def test_tool_less_causes_carry_a_stated_limitation() -> None:
     by_id = {r.scenario_id: r for r in run_evaluation().results}
-    # The loop has no disk or config tool, so those scenarios must
-    # say what they cannot score, in the result itself.
+    # Naming a cause from log wording is not measuring it: the
+    # loop has no disk, config or deploy tool, and those
+    # scenarios must say so in the result itself.
     assert "no disk tool" in by_id["disk-fill"].known_limitation
     assert "no config tool" in by_id["config-error"].known_limitation
     assert "no deploy tool" in by_id["bad-deploy"].known_limitation
@@ -120,4 +160,5 @@ def test_rendered_report_states_scores_and_limits() -> None:
     assert "Unsafe actions across the suite: 0" in text
     assert "pod-kill" in text
     assert "Known limitation:" in text
-    assert "Not scored yet" in text
+    assert "Not scored here" in text
+    assert "proposal-selection" in text

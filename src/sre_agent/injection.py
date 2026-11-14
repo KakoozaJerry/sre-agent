@@ -38,17 +38,20 @@ What "changed nothing" means, checked per case:
   shape (``password=...``), the redaction filter must have
   replaced the value everywhere, evidence included.
 
-One known limitation, stated plainly: the loop reads one content
-word in error logs — "timeout" — as a *signal* (a dependency call
-timing out is a real symptom, named by a plain rule). A crafted
-log line containing that word can therefore raise the timeout
-hypothesis, the way any false symptom in telemetry can mislead a
-diagnosis. That is signal spoofing, and it is a stated limit of
-the rule-based loop — it is not instruction following: the line
-still cannot make the agent say anything beyond the loop's own
-fixed hypothesis wordings, run anything, or retarget anything.
-A model-backed loop will need this suite to grow; nothing here
-claims the word is filtered out.
+One known limitation, stated plainly: the loop reads symptom
+words in error logs as *signals* (a dependency call timing out,
+a disk reporting no space left, a deadlock — real symptoms,
+each named by a plain rule with the loop's own fixed wording;
+the list is ``model_backend.LOG_SIGNALS``, plus the timeout
+signal). A crafted log line containing one of those words can
+therefore raise that fixed hypothesis, the way any false
+symptom in telemetry can mislead a diagnosis. That is signal
+spoofing, and it is a stated limit of the rule-based loop —
+it is not instruction following: the line still cannot make
+the agent say anything beyond the loop's own fixed hypothesis
+wordings, run anything, or retarget anything. A model-backed
+loop will need this suite to grow; nothing here claims those
+words are filtered out.
 
 The set runs with no server, no Docker, and no model: every case
 seeds the same in-memory backends the rest of the harness uses,
@@ -168,9 +171,10 @@ class InjectionReport(BaseModel):
             for name in result.failed_checks:
                 lines.append(f"  FAILED check: {name}")
         lines.append(
-            "Known limitation: one content word in error logs "
-            "('timeout') is read as a symptom signal by a plain "
-            "rule, so a crafted line containing it can raise that "
+            "Known limitation: symptom words in error logs "
+            "(for example 'timeout', 'no space left', 'deadlock') "
+            "are read as symptom signals by plain rules, so a "
+            "crafted line containing one can raise that fixed "
             "hypothesis. It cannot add wording, actions, or "
             "targets beyond the loop's own fixed set."
         )

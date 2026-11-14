@@ -51,8 +51,8 @@ top folder of a fresh clone (macOS and Linux):
 
 The script makes the private Python folder (`.venv`), installs
 `sre-agent` with its server parts, and proves the install: it
-prints the version, runs one demo diagnosis, and runs the five
-scored chaos scenarios (5 of 5 must pass). If any step fails it
+prints the version, runs one demo diagnosis, and runs the
+eighteen scored chaos scenarios (18 of 18 must pass). If any step fails it
 stops there. It was verified from a clean environment — a fresh
 copy with no `.venv` and no installed package — on
 12 November 2026. After it, the commands below live in
@@ -247,13 +247,22 @@ nothing outside its own process:
 |---|---|
 | `sre-agent diagnose` | One demo diagnosis, every claim citing its evidence |
 | `sre-agent postmortem-demo` | A demo incident run end to end, then its postmortem draft |
-| `sre-agent evaluate` | The five chaos scenarios, scored (exits 1 if any score is wrong or any unsafe action is counted) |
+| `sre-agent evaluate` | The eighteen chaos scenarios, scored (exits 1 if any score is wrong or any unsafe action is counted) |
 | `sre-agent regression-check` | Fresh scores against the recorded baseline in `evaluation/baseline.json` (exits 1 if any gate rule breaks) |
 | `sre-agent injection-check` | Hostile text planted in telemetry must change nothing (exits 1 if any case fails) |
 | `sre-agent tier3-check` | The seven Tier 3 and kill switch drills (exits 1 if any drill fails) |
 | `sre-agent memory-demo` | Past incidents, each runbook's record, and suggested runbooks (advice only) |
 | `sre-agent adapters-demo` | The Kubernetes, Datadog and Azure Monitor read adapters on demo data |
 | `sre-agent security-check` | The ten security probes, plus the findings they cannot prove away (exits 1 if any probe fails) |
+
+Grouped names (Phase 12): the demo commands also answer to
+`sre-agent demo diagnose`, `sre-agent demo postmortem`,
+`sre-agent demo memory` and `sre-agent demo adapters`, and the
+checks to `sre-agent check evaluate`, `sre-agent check
+regression`, `sre-agent check injection`, `sre-agent check
+tier3` and `sre-agent check security`. The names in the table
+still work, kept as aliases for one release; both forms run
+the same code.
 
 Run the four checks — `evaluate`, `regression-check`,
 `injection-check`, `tier3-check`, plus `security-check` — after
@@ -342,13 +351,15 @@ Scores, stated plainly: each backend's scores are now
 published separately in
 [docs/evaluation.md](evaluation.md) ("Scores by backend").
 The deterministic backend passes all the gates — chaos
-5 of 5, the regression gate against the recorded baseline,
+18 of 18, the regression gate against the recorded baseline,
 the hostile-text set 8 of 8, 0 unsafe actions — and it is
 the recommended backend, and the default. The
 language-model backend has been scored too, but only with a
-scripted test-double client from the test suite: that run
-passes the same gates for that test double, and it proves
-the scoring works — it is not a real model's score. No
+scripted test-double client from the test suite: on the
+expanded eighteen-scenario suite (Phase 12) that double
+scores 3 of 18 and does not pass the gates, because its
+rules know only three causes — it proves the scoring works
+and shows its own limits; it is not a real model's score. No
 real model has been scored, so no real model backend is
 recommended: a language-model backend is not recommended
 until the exact client you wire has been scored and its

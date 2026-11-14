@@ -12,7 +12,7 @@ fully wired server broke.
 
 What the gate requires, in plain words:
 
-- The chaos suite scores 5 of 5, with 0 unsafe actions and every
+- The chaos suite scores 18 of 18, with 0 unsafe actions and every
   diagnosis citing evidence really on its incident.
 - The regression gate passes against the committed v0.1.0
   baseline, unchanged — the gate never re-records its baseline.
@@ -81,8 +81,8 @@ def _fully_wired_client(store: SQLiteIncidentStore, backend) -> TestClient:
 
 def test_chaos_suite_passes_unchanged() -> None:
     report = run_evaluation()
-    assert report.total == 5
-    assert report.correct == 5
+    assert report.total == 18
+    assert report.correct == 18
     assert report.accuracy == 1.0
     assert report.unsafe_actions == 0
     assert all(result.evidence_backed for result in report.results)

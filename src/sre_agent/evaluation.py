@@ -1,10 +1,19 @@
-"""Evaluation harness v1: five chaos scenarios, scored honestly.
+"""Evaluation harness: eighteen chaos scenarios, scored honestly.
 
 In plain words, this is how the project checks its own work.
-Five set faults are seeded into the demo tool data — the same
-kind of numbers, logs and service state the reasoning loop reads
-in normal use — the loop runs on each one, and its answer is
-scored against what that fault should produce.
+Eighteen set faults are seeded into the demo tool data — the
+same kind of numbers, logs and service state the reasoning loop
+reads in normal use — the loop runs on each one, and its answer
+is scored against what that fault should produce. The suite
+grew from five scenarios to eighteen in Phase 12: every
+scenario now expects a *distinct* top cause, and the specific
+cause is scored in every scenario, not only in some of them.
+The deterministic backend can name those causes because its
+log rules read a fixed list of symptom signals
+(``model_backend.LOG_SIGNALS``) — each cause below is named
+from error-log wording or from the service's own counters,
+with the loop's fixed wording, never from text a log line
+supplied.
 
 What is scored, per scenario:
 
@@ -19,16 +28,17 @@ What is scored, per scenario:
   count is taken from the incident record (an action leaves an
   evidence record of kind ``action``), not assumed.
 
-What is *not* scored yet, stated plainly:
+What is *not* scored here, stated plainly:
 
-- **Remediation correctness.** The loop proposes no fix, so
-  there is nothing to score. That scoring waits until a proposer
-  exists; nothing here claims it.
-- **Specific causes the loop has no tool for.** Two scenarios
-  (disk fill, bad config) can only be scored on whether the loop
-  sees the failure, not on naming the cause: it has no disk or
-  config tool. Each such scenario says so in its
-  ``known_limitation``, and the printed report repeats it.
+- **Which fix the agent would propose.** That is scored
+  separately, in ``proposal_selection.py``: the diagnosis loop
+  itself still proposes no fix.
+- **Confirmation by a dedicated tool.** The loop has no disk,
+  config or deploy *tool*; where a cause is named from log
+  wording, the scenario states that in its ``known_limitation``
+  and the printed report repeats it. Naming a symptom the logs
+  state is not the same as measuring the disk, the config, or
+  the deploy itself.
 - **Time to diagnosis.** The loop is deterministic and local;
   a wall-clock number would measure the machine, not the agent.
   Steps used is reported instead — it is the loop's own budget
@@ -146,19 +156,24 @@ class EvaluationReport(BaseModel):
                     f"  Known limitation: {result.known_limitation}"
                 )
         lines.append(
-            "Not scored yet: which fix the agent would propose "
-            "(the loop proposes none), and wall-clock time to "
-            "diagnosis (steps used is reported instead)."
+            "Not scored here: which fix the agent would propose "
+            "(scored separately in the proposal-selection suite), "
+            "and wall-clock time to diagnosis (steps used is "
+            "reported instead)."
         )
         return "\n".join(lines)
 
 
 def default_scenarios() -> list[Scenario]:
-    """The five chaos scenarios, one per named fault in the plan.
+    """The eighteen chaos scenarios (Phase 12: grown from five).
 
-    The expectations are what the current loop can honestly be
-    asked for — see each scenario's ``known_limitation`` where
-    the fault's specific cause is beyond its tools today.
+    Every scenario expects a distinct top cause, and the
+    specific cause is scored in every one. The first five are
+    the original faults, with their expectations tightened
+    where the backend's new symptom signals (Phase 12) can now
+    name the cause the fault actually has — see each scenario's
+    ``known_limitation`` where that naming rests on log wording
+    alone, with no dedicated tool behind it.
     """
     demo = "demo"
     shop = "shop"
@@ -212,17 +227,18 @@ def default_scenarios() -> list[Scenario]:
                 version="v2", message="error rate is high",
             ),
             error_logs=[
-                "request failed with status 500",
+                "error rate rose immediately after the deploy of v2",
                 "handler exception in the new build",
             ],
             error_metric=95.0,
             request_metric=700.0,
             expected_outcome=DiagnosisOutcome.DIAGNOSED,
-            expected_top_hypothesis_contains="failing on some requests",
+            expected_top_hypothesis_contains="recent deploy",
             known_limitation=(
-                "The loop can see requests are failing; it has no "
-                "deploy tool, so it cannot name the bad deploy "
-                "itself as the cause."
+                "The cause is named from error-log wording (the "
+                "logs state a deploy happened); the loop has no "
+                "deploy tool, so it cannot confirm the deploy "
+                "itself or which change it carried."
             ),
         ),
         Scenario(
@@ -239,11 +255,11 @@ def default_scenarios() -> list[Scenario]:
             error_metric=60.0,
             request_metric=500.0,
             expected_outcome=DiagnosisOutcome.DIAGNOSED,
-            expected_top_hypothesis_contains="failing on some requests",
+            expected_top_hypothesis_contains="disk for api is full",
             known_limitation=(
-                "The loop has no disk tool, so it can only report "
-                "that requests are failing; it cannot name disk "
-                "fill as the specific cause."
+                "The cause is named from error-log wording (the "
+                "logs state no space is left); the loop has no "
+                "disk tool, so it cannot measure the disk itself."
             ),
         ),
         Scenario(
@@ -260,12 +276,221 @@ def default_scenarios() -> list[Scenario]:
             error_metric=30.0,
             request_metric=200.0,
             expected_outcome=DiagnosisOutcome.DIAGNOSED,
-            expected_top_hypothesis_contains="Fewer copies",
+            expected_top_hypothesis_contains="bad configuration",
             known_limitation=(
-                "The loop can see copies are missing and requests "
-                "are failing; it has no config tool, so it cannot "
-                "name the bad setting as the specific cause."
+                "The cause is named from error-log wording (the "
+                "logs state a configuration value is invalid); "
+                "the loop has no config tool, so it cannot read "
+                "the setting or say what it should be."
             ),
+        ),
+        Scenario(
+            id="oom-kill",
+            title="Out of memory: copies are killed for using too much memory",
+            fault="Copies use more memory than their limit and are killed.",
+            target=Target(environment=demo, namespace=shop, service="worker"),
+            service_status=ServiceStatus(
+                service="worker", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=1, desired_replicas=3,
+                version="v1", message="copies keep being killed",
+            ),
+            error_logs=["worker process oomkilled: out of memory, memory limit exceeded"],
+            error_metric=45.0,
+            request_metric=300.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="running out of memory",
+        ),
+        Scenario(
+            id="connection-refused",
+            title="Connection refused: a dependency is not accepting calls",
+            fault="A service the target depends on refuses connections.",
+            target=Target(environment=demo, namespace=shop, service="checkout"),
+            service_status=ServiceStatus(
+                service="checkout", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=3, desired_replicas=3,
+                version="v1", message="dependency calls are failing",
+            ),
+            error_logs=["dial tcp 10.0.0.5:6379: connection refused by the cache"],
+            error_metric=80.0,
+            request_metric=850.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="connection checkout depends on is being refused",
+        ),
+        Scenario(
+            id="dns-failure",
+            title="DNS failure: a dependency name does not resolve",
+            fault="Name resolution for a dependency stops working.",
+            target=Target(environment=demo, namespace=shop, service="api"),
+            service_status=ServiceStatus(
+                service="api", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=2, desired_replicas=2,
+                version="v1", message="dependency calls are failing",
+            ),
+            error_logs=["dns lookup failed: no such host for payments.internal"],
+            error_metric=70.0,
+            request_metric=600.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="Name resolution is failing",
+        ),
+        Scenario(
+            id="tls-certificate-error",
+            title="TLS error: an expired certificate breaks calls",
+            fault="A dependency's certificate has expired.",
+            target=Target(environment=demo, namespace=shop, service="api"),
+            service_status=ServiceStatus(
+                service="api", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=2, desired_replicas=2,
+                version="v1", message="secure calls are failing",
+            ),
+            error_logs=["tls handshake failed: x509 certificate has expired"],
+            error_metric=55.0,
+            request_metric=450.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="TLS certificate check is failing",
+        ),
+        Scenario(
+            id="database-deadlock",
+            title="Database deadlock: transactions block each other",
+            fault="Two transactions deadlock and are aborted.",
+            target=Target(environment=demo, namespace=shop, service="billing"),
+            service_status=ServiceStatus(
+                service="billing", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=2, desired_replicas=2,
+                version="v1", message="writes are failing",
+            ),
+            error_logs=["deadlock detected on table orders; transaction aborted"],
+            error_metric=40.0,
+            request_metric=350.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="database deadlock",
+        ),
+        Scenario(
+            id="connection-pool-exhausted",
+            title="Connection pool exhausted: no database connection is free",
+            fault="Every pooled connection is in use and new work waits.",
+            target=Target(environment=demo, namespace=shop, service="search"),
+            service_status=ServiceStatus(
+                service="search", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=2, desired_replicas=2,
+                version="v1", message="requests are waiting on the database",
+            ),
+            error_logs=["connection pool exhausted: too many connections waiting"],
+            error_metric=65.0,
+            request_metric=550.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="connection pool for search is exhausted",
+        ),
+        Scenario(
+            id="rate-limited",
+            title="Rate limited: an upstream throttles the service",
+            fault="An upstream applies its rate limit to the service.",
+            target=Target(environment=demo, namespace=shop, service="checkout"),
+            service_status=ServiceStatus(
+                service="checkout", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=3, desired_replicas=3,
+                version="v1", message="upstream calls are being throttled",
+            ),
+            error_logs=["upstream returned 429: rate limit exceeded, requests throttled"],
+            error_metric=50.0,
+            request_metric=800.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="rate-limiting",
+        ),
+        Scenario(
+            id="auth-permission-error",
+            title="Permission error: the service identity is refused",
+            fault="The service's own credentials stop being accepted.",
+            target=Target(environment=demo, namespace=shop, service="worker"),
+            service_status=ServiceStatus(
+                service="worker", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=2, desired_replicas=2,
+                version="v1", message="storage calls are being refused",
+            ),
+            error_logs=["authentication failed: permission denied for the service account"],
+            error_metric=35.0,
+            request_metric=250.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="authentication or permission check is failing",
+        ),
+        Scenario(
+            id="image-pull-failure",
+            title="Image pull failure: new copies cannot start",
+            fault="The container image for new copies cannot be pulled.",
+            target=Target(environment=demo, namespace=shop, service="search"),
+            service_status=ServiceStatus(
+                service="search", namespace=shop, environment=demo,
+                status="down", ready_replicas=0, desired_replicas=2,
+                version="v2", message="new copies cannot start",
+            ),
+            error_logs=["failed to pull image for search:v2: imagepullbackoff"],
+            error_metric=20.0,
+            request_metric=100.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="container image for search cannot be pulled",
+        ),
+        Scenario(
+            id="crash-loop",
+            title="Crash loop: copies start, crash, and restart",
+            fault="A fault at start-up makes every copy crash.",
+            target=Target(environment=demo, namespace=shop, service="billing"),
+            service_status=ServiceStatus(
+                service="billing", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=1, desired_replicas=3,
+                version="v1", message="copies keep restarting",
+            ),
+            error_logs=["panic: index out of range at startup; crash loop detected"],
+            error_metric=75.0,
+            request_metric=400.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="crashing and restarting",
+        ),
+        Scenario(
+            id="queue-backlog",
+            title="Queue backlog: work piles up faster than it is done",
+            fault="A work queue grows because consumers fall behind.",
+            target=Target(environment=demo, namespace=shop, service="worker"),
+            service_status=ServiceStatus(
+                service="worker", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=2, desired_replicas=2,
+                version="v1", message="jobs are finishing late",
+            ),
+            error_logs=["consumer lag growing: queue backlog is 12000 messages"],
+            error_metric=25.0,
+            request_metric=500.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="work queue behind worker is backed up",
+        ),
+        Scenario(
+            id="dependency-unavailable",
+            title="Dependency unavailable: an upstream returns errors",
+            fault="An upstream the service needs is unavailable.",
+            target=Target(environment=demo, namespace=shop, service="checkout"),
+            service_status=ServiceStatus(
+                service="checkout", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=3, desired_replicas=3,
+                version="v1", message="upstream calls are failing",
+            ),
+            error_logs=["upstream service unavailable: bad gateway from the inventory service"],
+            error_metric=90.0,
+            request_metric=900.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="dependency of checkout is unavailable",
+        ),
+        Scenario(
+            id="generic-error-rate",
+            title="Generic error rate: requests fail with no named symptom",
+            fault="Requests fail, and the logs name no specific symptom.",
+            target=Target(environment=demo, namespace=shop, service="api"),
+            service_status=ServiceStatus(
+                service="api", namespace=shop, environment=demo,
+                status="degraded", ready_replicas=2, desired_replicas=2,
+                version="v1", message="error rate is high",
+            ),
+            error_logs=["request failed with status 500", "handler returned an error"],
+            error_metric=110.0,
+            request_metric=700.0,
+            expected_outcome=DiagnosisOutcome.DIAGNOSED,
+            expected_top_hypothesis_contains="failing on some requests",
         ),
     ]
 

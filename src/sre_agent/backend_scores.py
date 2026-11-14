@@ -8,7 +8,7 @@ from every other backend's. This module is that run.
 
 What ``score_backend`` does, for one backend:
 
-- Runs the five chaos scenarios with the backend
+- Runs the eighteen chaos scenarios with the backend
   (``evaluation.run_evaluation(..., backend=...)``).
 - Applies the regression gate to that run against the
   recorded baseline — the same baseline every backend is

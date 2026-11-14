@@ -11,6 +11,13 @@ Two backends live here:
 - **The deterministic backend (the default).** A small set of
   plain rules over the gathered results — no model call, no API
   key, and every diagnosis can be checked exactly in tests.
+  Since Phase 12 its log rules read a fixed list of symptom
+  signals (``LOG_SIGNALS``: a full disk, a bad configuration
+  value, running out of memory, a deadlock, and more), each
+  with this module's own fixed hypothesis wording, so the
+  specific cause can be scored in every chaos scenario. A log
+  line can raise one of those fixed wordings; it can never
+  add wording, an action, or a target of its own.
   This is the backend every shipped wiring uses: the demo, the
   CLI, the evaluation suites and the shipped server app. A loop
   or a server built with no backend given gets this one.
@@ -81,6 +88,55 @@ log = get_logger(__name__)
 # it. ``reasoning.py`` holds the loop's own copy for its plan;
 # the two must agree, and the tests check the claims that result.
 ERROR_METRIC = "http_request_errors_total"
+
+# Symptom signals in error-log wording (Phase 12). Each entry is
+# (words that must appear in the joined lower-case log text, the
+# hypothesis wording, its confidence). The wording is this
+# module's own fixed text — a log line can raise a hypothesis
+# from this list, never add wording of its own — and every
+# specific signal outranks the generic "failing on some
+# requests" fallback (0.6) and the missing-copies hypothesis
+# (0.65), because a named symptom is more useful than either.
+# The timeout signal stays separate below: it is the original
+# signal, and the error metric can strengthen it to 0.85.
+# This is also the signal-spoofing surface, stated plainly in
+# ``injection.py``: a crafted line carrying one of these words
+# can raise that fixed hypothesis, and nothing beyond it.
+LOG_SIGNALS: list[tuple[tuple[str, ...], str, float]] = [
+    (("no space left", "disk is full", "disk full"),
+     "The disk for {service} is full, so writes are failing", 0.8),
+    (("invalid configuration", "bad configuration", "config error",
+      "invalid config"),
+     "A bad configuration value is breaking {service}", 0.8),
+    (("out of memory", "oomkilled", "oom killed", "memory limit exceeded"),
+     "{service} is running out of memory", 0.8),
+    (("imagepullbackoff", "failed to pull image", "image pull"),
+     "A container image for {service} cannot be pulled", 0.8),
+    (("panic:", "segfault", "fatal error", "crashloopbackoff", "crash loop"),
+     "{service} is crashing and restarting repeatedly", 0.8),
+    (("deadlock",),
+     "A database deadlock is blocking {service}", 0.8),
+    (("connection pool", "pool exhausted", "too many connections"),
+     "The connection pool for {service} is exhausted", 0.8),
+    (("dns", "name resolution", "no such host"),
+     "Name resolution is failing for a dependency of {service}", 0.8),
+    (("certificate", "tls handshake", "x509", "ssl handshake"),
+     "A TLS certificate check is failing for {service}", 0.8),
+    (("permission denied", "unauthorized", "authentication failed",
+      "access denied"),
+     "An authentication or permission check is failing for {service}", 0.8),
+    (("rate limit", "rate-limit", "too many requests", "throttled", " 429"),
+     "An upstream is rate-limiting {service}", 0.8),
+    (("connection refused", "connection reset"),
+     "A connection {service} depends on is being refused", 0.8),
+    (("deploy", "new build", "new version", "rollout"),
+     "A recent deploy is the likely cause for {service}", 0.8),
+    (("queue is full", "queue backlog", "backlog", "consumer lag"),
+     "A work queue behind {service} is backed up", 0.8),
+    (("upstream unavailable", "bad gateway", "service unavailable",
+      "dependency unavailable"),
+     "A dependency of {service} is unavailable", 0.8),
+]
 
 MAX_STATEMENT_CHARS = 300
 
@@ -208,6 +264,17 @@ class DeterministicBackend:
             )
             messages = " ".join(e.message.lower() for e in logs_result.entries)
             timeout_seen = "timeout" in messages or "timed out" in messages
+            specific_seen = False
+            for keywords, wording, confidence in LOG_SIGNALS:
+                if any(word in messages for word in keywords):
+                    specific_seen = True
+                    hypotheses.append(
+                        Hypothesis(
+                            statement=wording.format(service=target.service),
+                            supporting_evidence=[logs_ev.id],
+                            confidence=confidence,
+                        )
+                    )
             if timeout_seen:
                 hypotheses.append(
                     Hypothesis(
@@ -218,7 +285,7 @@ class DeterministicBackend:
                         confidence=0.75,
                     )
                 )
-            else:
+            if not timeout_seen and not specific_seen:
                 hypotheses.append(
                     Hypothesis(
                         statement=(

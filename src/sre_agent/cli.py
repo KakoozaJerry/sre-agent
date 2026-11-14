@@ -5,17 +5,24 @@ terminal:
 
     sre-agent incidents [--base-url URL]
     sre-agent show <incident-id> [--base-url URL]
-    sre-agent diagnose
-    sre-agent approve-demo --by NAME [--runbook ID] [--replicas N] [--yes]
-    sre-agent postmortem-demo
-    sre-agent evaluate
-    sre-agent regression-check [--baseline PATH] [--update-baseline]
-    sre-agent injection-check
-    sre-agent tier3-check
-    sre-agent memory-demo
-    sre-agent adapters-demo
-    sre-agent security-check
+    sre-agent demo diagnose
+    sre-agent demo approve --by NAME [--runbook ID] [--replicas N] [--yes]
+    sre-agent demo postmortem
+    sre-agent demo memory
+    sre-agent demo adapters
+    sre-agent check evaluate
+    sre-agent check regression [--baseline PATH] [--update-baseline]
+    sre-agent check injection
+    sre-agent check tier3
+    sre-agent check security
     sre-agent --version
+
+The demo commands and the scored checks also answer to their
+old names — ``diagnose``, ``approve-demo``, ``postmortem-demo``,
+``memory-demo``, ``adapters-demo``, ``evaluate``,
+``regression-check``, ``injection-check``, ``tier3-check`` and
+``security-check`` — kept as aliases for one release (Phase 12).
+The product commands, ``incidents`` and ``show``, did not move.
 
 How it works, honestly:
 
@@ -60,7 +67,7 @@ its record (see postmortems.py). Drafting a postmortem for a live
 server incident is not wired yet, for the same reason: the draft
 needs the full record, including its audit records, in one place.
 
-``evaluate`` runs the chaos scenario suite locally — five seeded
+``evaluate`` runs the chaos scenario suite locally — eighteen seeded
 faults, no server or Docker needed — and prints the scored
 report (see evaluation.py): how many diagnoses were correct,
 and how many unsafe actions ran (zero, counted from the incident
@@ -182,7 +189,7 @@ USAGE = """Usage:
                                          approve that exact action (Tier 2)
   sre-agent postmortem-demo              Run a demo incident end to end and
                                          print its postmortem draft
-  sre-agent evaluate                     Run the five chaos scenarios on
+  sre-agent evaluate                     Run the eighteen chaos scenarios on
                                          seeded demo data and print the
                                          scored report (exit 1 if any
                                          scenario fails or any unsafe
@@ -229,7 +236,21 @@ USAGE = """Usage:
                                          probes cannot prove away are
                                          printed (exit 1 if any probe
                                          fails)
+  sre-agent demo diagnose                Same as: diagnose
+  sre-agent demo approve --by NAME       Same as: approve-demo --by NAME
+  sre-agent demo postmortem              Same as: postmortem-demo
+  sre-agent demo memory                  Same as: memory-demo
+  sre-agent demo adapters                Same as: adapters-demo
+  sre-agent check evaluate               Same as: evaluate
+  sre-agent check regression             Same as: regression-check
+  sre-agent check injection              Same as: injection-check
+  sre-agent check tier3                  Same as: tier3-check
+  sre-agent check security               Same as: security-check
   sre-agent --version                    Print the version
+
+The demo ... and check ... forms are the grouped names (Phase 12).
+Every old name above them still works, kept as an alias for one
+release; the grouped form and its alias run exactly the same code.
 
 The server address defaults to http://127.0.0.1:8080 and can also be
 set with the SRE_AGENT_BASE_URL environment variable. The address
@@ -583,6 +604,63 @@ def run_regression_check(
     return 0 if result.passed else 1
 
 
+# Phase 12 restructure: the demo commands and the scored checks
+# live under two grouped names, so the product commands
+# (incidents, show) are no longer mixed in with the demo and the
+# test harness. Each grouped name maps to exactly the command it
+# replaces; the old names stay as aliases for one release and are
+# handled by the same dispatch below, so both forms run the same
+# code and cannot drift apart.
+DEMO_COMMANDS: dict[str, str] = {
+    "diagnose": "diagnose",
+    "approve": "approve-demo",
+    "approve-demo": "approve-demo",
+    "postmortem": "postmortem-demo",
+    "postmortem-demo": "postmortem-demo",
+    "memory": "memory-demo",
+    "memory-demo": "memory-demo",
+    "adapters": "adapters-demo",
+    "adapters-demo": "adapters-demo",
+}
+
+CHECK_COMMANDS: dict[str, str] = {
+    "evaluate": "evaluate",
+    "evaluation": "evaluate",
+    "regression": "regression-check",
+    "regression-check": "regression-check",
+    "injection": "injection-check",
+    "injection-check": "injection-check",
+    "tier3": "tier3-check",
+    "tier3-check": "tier3-check",
+    "security": "security-check",
+    "security-check": "security-check",
+}
+
+
+def _resolve_grouped_command(
+    command: str, rest: list[str]
+) -> tuple[str, list[str]] | None:
+    """Turn ``demo X`` / ``check X`` into the command X names.
+
+    Returns ``None`` when *command* is not a group name, so the
+    caller keeps its normal dispatch (old names included). Raises
+    CliError when a group name has no known subcommand.
+    """
+    groups = {"demo": DEMO_COMMANDS, "check": CHECK_COMMANDS}
+    mapping = groups.get(command)
+    if mapping is None:
+        return None
+    if not rest:
+        raise CliError(
+            f"{command} needs a subcommand: one of "
+            + ", ".join(sorted(set(mapping.values())))
+        )
+    target = mapping.get(rest[0])
+    if target is None:
+        raise CliError(f"unknown {command} subcommand {rest[0]!r}")
+    return target, rest[1:]
+
+
 def main(
     argv: list[str] | None = None,
     *,
@@ -609,6 +687,13 @@ def main(
         return 0
 
     command, rest = args[0], args[1:]
+    try:
+        resolved = _resolve_grouped_command(command, rest)
+    except CliError as exc:
+        print(f"sre-agent: {exc}\n\n{USAGE}", file=sys.stderr)
+        return 2
+    if resolved is not None:
+        command, rest = resolved
     try:
         if command == "diagnose":
             if rest:

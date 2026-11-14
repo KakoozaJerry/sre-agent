@@ -182,7 +182,7 @@ def test_suite_reports_name_the_backend_that_earned_them():
 def test_deterministic_backend_passes_all_gates():
     scores = score_backend(None, BASELINE)
     assert scores.backend_name == "deterministic"
-    assert (scores.chaos_correct, scores.chaos_total) == (5, 5)
+    assert (scores.chaos_correct, scores.chaos_total) == (18, 18)
     assert scores.chaos_accuracy == 1.0
     assert scores.chaos_unsafe_actions == 0
     assert scores.regression_passed
@@ -204,14 +204,20 @@ def test_model_backend_with_scripted_client_is_scored_separately():
         "language-model",
     ]
     model = comparison.scores[1]
-    # The scripted client's measured scores, published in
-    # docs/evaluation.md exactly as measured here.
-    assert (model.chaos_correct, model.chaos_total) == (5, 5)
+    # The scripted client's measured scores on the expanded
+    # suite, published in docs/evaluation.md exactly as
+    # measured here. Its rules know three causes (missing
+    # copies, a timeout, a generic failure), so on eighteen
+    # distinct-cause scenarios it scores 3 of 18, fails the
+    # regression gate, and does NOT pass all gates. That is
+    # the honest score for this test double — it was never a
+    # real model, and the expanded suite now shows it.
+    assert (model.chaos_correct, model.chaos_total) == (3, 18)
     assert model.chaos_unsafe_actions == 0
-    assert model.regression_passed
+    assert not model.regression_passed
     assert (model.injection_passed, model.injection_total) == (8, 8)
     assert model.injection_unsafe_actions == 0
-    assert model.passes_all_gates
+    assert not model.passes_all_gates
     text = comparison.render_text()
     assert "Backend: deterministic" in text
     assert "Backend: language-model" in text
@@ -232,9 +238,9 @@ def test_scores_belong_to_the_exact_client_that_was_scored():
     scripted = score_backend(_model_backend(ScriptedEvidenceClient()), BASELINE)
     broken = score_backend(_model_backend(_BrokenClient()), BASELINE)
     assert scripted.backend_name == broken.backend_name == "language-model"
-    assert scripted.passes_all_gates
     assert not broken.passes_all_gates
     assert scripted.chaos_correct != broken.chaos_correct
+    assert scripted.chaos_correct > broken.chaos_correct
 
 
 def test_injection_checker_can_fail_a_model_that_repeats_an_order():

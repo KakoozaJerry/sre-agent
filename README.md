@@ -105,7 +105,7 @@ for later work. Current numbers live in
 - [docs/security-review.md](docs/security-review.md) — the security review and red-team report on the agent itself: what was attacked, what held, and the findings that remain.
 - [docs/operator-guide.md](docs/operator-guide.md) — running the agent day to day: install, server, CLI, approvals, stopping it, and the checks to run after any change.
 - [docs/runbook-authoring-guide.md](docs/runbook-authoring-guide.md) — writing a new runbook: the four places that must agree, honest blast-radius counting, and the tests it must have.
-- [docs/evaluation.md](docs/evaluation.md) — the evaluation harness: the five scenarios, what is scored, and what is not scored yet.
+- [docs/evaluation.md](docs/evaluation.md) — the evaluation harness: the eighteen scenarios, what is scored, and what is not scored yet.
 - [docs/demo.md](docs/demo.md) — the demo environment: what runs, how to start it, and how to break it on purpose.
 - [docs/hosted-demo.md](docs/hosted-demo.md) — the public-safe hosted demo mode (Phase 10): a token is required with no fallback, seeded demo data only, the Tier 3 demo grant is the only action that can run, and the ingestion caps stay on. It also carries the deployment package: Render on the free plan ($0, named before anything is paid for), the `render.yaml` Blueprint and `Dockerfile.hosted`, deployed on Render's free plan at https://sre-agent-demo.onrender.com.
 - [docs/how-it-works.md](docs/how-it-works.md) — the whole system explained simply.
@@ -129,8 +129,8 @@ That is the whole install. The script makes a private Python
 folder (`.venv`, nothing is installed system-wide), installs
 `sre-agent` with its server parts from this source copy, and
 then proves the install works: it prints the version, runs one
-demo diagnosis, and runs the five scored chaos scenarios, which
-must score 5 of 5. If any step fails, the script stops there and
+demo diagnosis, and runs the eighteen scored chaos scenarios, which
+must score 18 of 18. If any step fails, the script stops there and
 says so — it never prints success for a step that did not pass.
 It was verified from a clean environment (a fresh copy with no
 `.venv` and no installed package) on 12 November 2026. Windows
@@ -302,7 +302,7 @@ uvicorn sre_agent.server:app --port 8080 # in another terminal: the server
 sre-agent incidents                      # list what the server knows
 sre-agent show <incident-id>             # one incident, with its diagnosis
 sre-agent postmortem-demo                # a demo incident's postmortem draft
-sre-agent evaluate                       # five chaos scenarios, scored
+sre-agent evaluate                       # eighteen chaos scenarios, scored
 sre-agent regression-check               # fresh scores vs the recorded baseline
 sre-agent injection-check                # hostile telemetry must change nothing
 sre-agent tier3-check                    # Tier 3 drills + kill switch drills (demo)
@@ -310,6 +310,15 @@ sre-agent memory-demo                    # past incidents, runbook records, sugg
 sre-agent adapters-demo                  # Kubernetes pods, Datadog metrics, Azure KQL (all read-only)
 sre-agent security-check                 # ten probes attack the agent itself; findings printed
 ```
+
+The demo commands and the scored checks also have grouped
+names: `sre-agent demo diagnose`, `sre-agent demo approve`,
+`sre-agent demo postmortem`, `sre-agent demo memory`,
+`sre-agent demo adapters`, and `sre-agent check evaluate`,
+`sre-agent check regression`, `sre-agent check injection`,
+`sre-agent check tier3`, `sre-agent check security`. The old
+names above still work — they are kept as aliases for one
+release and run exactly the same code.
 
 ## Contributing
 

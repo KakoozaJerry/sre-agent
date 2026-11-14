@@ -1,7 +1,7 @@
 """Regression gate: the suite's scores may not quietly get worse.
 
 In plain words, the evaluation harness (evaluation.py) scores the
-agent on five set faults. This module is the gate that compares a
+agent on eighteen set faults. This module is the gate that compares a
 fresh run of that suite against a recorded baseline — the scores
 of the last release, kept in a small JSON file in the repo at
 ``evaluation/baseline.json`` — and says, in plain words, whether

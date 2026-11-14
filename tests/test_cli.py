@@ -269,3 +269,35 @@ def test_cli_reads_a_real_incident_from_the_server_app(capsys):
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+# --- grouped demo / check names (Phase 12 restructure) -------------------------
+
+
+def test_demo_diagnose_matches_the_old_name(capsys):
+    assert main(["demo", "diagnose"], run_demo_diagnosis=demo_diagnosis) == 0
+    out = capsys.readouterr().out
+    assert "seeded demo data" in out
+    assert "Outcome: diagnosed" in out
+
+
+def test_check_evaluate_runs_the_suite(capsys):
+    from sre_agent.evaluation import run_evaluation
+
+    assert main(["check", "evaluate"], run_suite=run_evaluation) == 0
+    out = capsys.readouterr().out
+    assert "Scenarios: 18" in out and "Correct diagnoses: 18" in out
+
+
+def test_grouped_names_reject_unknown_subcommands(capsys):
+    assert main(["demo", "bogus"]) == 2
+    assert "unknown demo subcommand" in capsys.readouterr().err
+    assert main(["check"]) == 2
+    assert "needs a subcommand" in capsys.readouterr().err
+
+
+def test_old_names_still_work_as_aliases(capsys):
+    # The alias and the grouped form run the same dispatch: the old
+    # diagnose name still works in the same pass that adds demo.
+    assert main(["diagnose"], run_demo_diagnosis=demo_diagnosis) == 0
+    assert "Outcome: diagnosed" in capsys.readouterr().out
