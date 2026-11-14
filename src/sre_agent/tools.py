@@ -112,7 +112,7 @@ _SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.compile(
             r"(?i)(password|passwd|pwd|client[_-]?secret|access[_-]?token"
             r"|refresh[_-]?token|id[_-]?token|auth[_-]?token"
-            r"|session[_-]?token|secret|token|api[_-]?key|apikey"
+            r"|session[_-]?token|account[_-]?key|secret|token|api[_-]?key|apikey"
             r"|private[_-]?key)"
             r"(\s*[:=]\s*[\"']?)[^\s;,\"']+"
         ),
