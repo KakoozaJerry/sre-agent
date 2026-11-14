@@ -104,6 +104,32 @@ def test_allow_list_cannot_widen_the_https_rule() -> None:
         )
 
 
+def test_allow_http_hosts_is_a_separate_explicit_exception() -> None:
+    # Phase 12: the Compose demo's Prometheus speaks plain http
+    # on a private container network. Naming its host in the
+    # separate allow_http_hosts list accepts exactly that host;
+    # the default, and every other host, are unchanged.
+    assert (
+        validate_backend_url(
+            "http://prometheus:9090", allow_http_hosts=["prometheus"]
+        )
+        == "http://prometheus:9090"
+    )
+    with pytest.raises(ValueError, match="plain http"):
+        validate_backend_url("http://prometheus:9090")
+    with pytest.raises(ValueError, match="plain http"):
+        validate_backend_url(
+            "http://metrics.example.com:9090",
+            allow_http_hosts=["prometheus"],
+        )
+    # The Prometheus backend carries the same exception through.
+    PrometheusMetricsBackend(
+        "http://prometheus:9090", allow_http_hosts=["prometheus"]
+    )
+    with pytest.raises(ValueError, match="plain http"):
+        PrometheusMetricsBackend("http://prometheus:9090")
+
+
 def test_every_live_backend_checks_its_address_at_build_time() -> None:
     with pytest.raises(ValueError):
         PrometheusMetricsBackend("http://metrics.example.com:9090")

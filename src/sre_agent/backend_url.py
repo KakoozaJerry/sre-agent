@@ -31,6 +31,21 @@ backend applies the same rules:
   the agent may call; it can never widen the scheme rule — an
   allow-list entry does not make plain http to a remote host
   acceptable.
+- **One explicit exception, named differently on purpose.**
+  A caller may pass a separate list, ``allow_http_hosts``,
+  naming hosts where plain http is accepted even though they
+  are not loopback. This exists for one case: a private
+  container network the operator controls, where the service
+  speaks only http and its traffic never leaves that network —
+  the Docker Compose demo's Prometheus, at
+  ``http://prometheus:9090``, is the case this was added for
+  (Phase 12). It is a separate parameter, not a widening of
+  ``allowed_hosts``, so the rule above still holds for that
+  list; naming a host here is the operator's deliberate,
+  written-down decision for that one host, it applies to no
+  other host, and no credential is sent to the demo's
+  Prometheus (it takes none). Addresses still come only from
+  operator code or configuration, never from telemetry.
 
 The check runs when a backend is built, before any request is
 made, and raises ``ValueError`` with a plain reason. Addresses
@@ -101,6 +116,7 @@ def validate_backend_url(
     url: str,
     *,
     allowed_hosts: Iterable[str] | None = None,
+    allow_http_hosts: Iterable[str] | None = None,
     what: str = "backend address",
 ) -> str:
     """Check one base address against the rules; return it cleaned.
@@ -126,12 +142,24 @@ def validate_backend_url(
             f"{what} must not carry a user or password in the address: {url!r}"
         )
     if parsed.scheme == "http" and not _is_loopback(host):
-        raise ValueError(
-            f"{what} uses plain http to a host that is not on this "
-            f"machine ({host}); use https:// for any address beyond "
-            "localhost, so a credential cannot cross a network "
-            "unencrypted"
-        )
+        # The one explicit exception: a host the operator named
+        # in ``allow_http_hosts`` for a private network they
+        # control (see this module's docstring). Any other host
+        # is refused, exactly as before.
+        http_entries = list(allow_http_hosts) if allow_http_hosts else []
+        try:
+            http_port = parsed.port
+        except ValueError:
+            http_port = -1
+        if not any(
+            _host_matches(host, http_port, entry) for entry in http_entries
+        ):
+            raise ValueError(
+                f"{what} uses plain http to a host that is not on this "
+                f"machine ({host}); use https:// for any address beyond "
+                "localhost, so a credential cannot cross a network "
+                "unencrypted"
+            )
     if allowed_hosts is not None:
         entries = list(allowed_hosts)
         try:

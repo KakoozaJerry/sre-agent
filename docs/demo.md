@@ -25,11 +25,20 @@ top folder of this repository:
   it sends it to the agent's webhook, and when the failure stops
   it sends a "resolved" message too, so the agent can close the
   incident.
-- **sre-agent** — this project's webhook server, the shipped app.
-  It turns the alert into an incident and diagnoses it at once,
-  and it serves the approval flow for fixes. Its diagnosis reads
-  the seeded demo data (see the honest limits below), not the
-  demo's live Prometheus numbers.
+- **sre-agent** — this project's webhook server, run in the
+  Compose demo through its live factory
+  (`sre_agent.demo_live:create_live_demo_app`). It turns the
+  alert into an incident and diagnoses it at once, and it
+  serves the approval flow for fixes. Its diagnosis reads the
+  demo's own live Prometheus for its metrics and its service
+  status, and the sample service's own recorded log lines for
+  its logs — so the diagnosis is of the fault
+  `./demo/inject_fault.sh` actually injected, not of a seeded
+  picture. (The shipped app outside Compose,
+  `sre_agent.server:app`, is a different wiring: it still
+  reads the seeded demo data, and the README walkthrough that
+  uses it says so. The hosted demo is unchanged too — seeded
+  and Tier-3-only by design.)
 
 ## Run it
 
@@ -60,12 +69,15 @@ curl http://localhost:8080/incidents
 
 1. **Send the demo alert.** `./demo/inject_fault.sh` (above) does
    this the real way, through Prometheus and Alertmanager. The
-   incident it opens is diagnosed at once, from the seeded demo
-   data.
+   incident it opens is diagnosed at once, from the live
+   Prometheus numbers and the sample service's live log lines:
+   the error count in the evidence is the count Prometheus
+   scraped from the failing service, not a seeded number.
 2. **Read the diagnosis.** `curl http://localhost:8080/incidents`
    lists it; `curl http://localhost:8080/incidents/<id>` shows the
-   diagnosis, the evidence behind it, and the past-incident
-   advice.
+   diagnosis and the evidence behind it. (This live wiring
+   carries no seeded past-incident advice — advice in this
+   mode would have to be live too, or not present.)
 3. **Propose the restart, and approve it by name.** The shipped
    server runs under a Tier 2 policy, so a fix waits for a person:
 
@@ -118,11 +130,6 @@ is built — an invented digest would be worse than the tag.
 
 ## What the demo does not do — honestly
 
-- The diagnosis reads seeded demo data, not the demo's live
-  Prometheus numbers: the shipped server is built with the demo
-  tool layer, so the alert path is live but the evidence behind
-  the diagnosis is the seeded set. A real deployment passes its
-  own tool layer to the server.
 - A fix runs against the seeded demo workloads, not against the
   sample-service container: approving the restart changes the
   demo workload records the agent keeps, and the sample service
@@ -143,6 +150,18 @@ webhook address, and the metric names — and it runs the whole
 visitor path above against the shipped server, using the demo
 files' own alert labels and summary: alert, diagnosis, a restart
 approved by name, and the resolved alert closing the incident.
+
+The live wiring is checked the same honest way, in
+`tests/test_demo_live.py`: a fake Prometheus answering in the
+real Prometheus reply shape with values the test chooses, and
+the real sample service driven the way `inject_fault.sh` drives
+it. With the failure on, the live diagnosis names that fault
+and its metric evidence carries the live count (3, in the
+test) — not the seeded layer's 162; with no failure recorded,
+the same live layer says "I don't know", where the seeded
+layer would always diagnose its made-up picture. The Compose
+file's live factory and its two service addresses are pinned
+as text, like the rest of the wiring.
 
 A full `docker compose up` run needs Docker, and there is
 no Docker in the build environment where this project is

@@ -15,6 +15,11 @@ In plain words:
   (``http_requests_total`` and ``http_request_errors_total``), so
   the demo, the alert rule, and the diagnosis all talk about the
   same numbers.
+- It also records one log line per request it serves and serves
+  them at ``/logs``, so the agent's live demo diagnosis (Phase
+  12) reads log lines this service really produced — a failing
+  request's line carries the same "downstream call timed out"
+  detail its ``/work`` reply carries — instead of seeded lines.
 - It uses only the Python standard library, so its container
   image is small and there is nothing extra to install.
 
@@ -24,6 +29,7 @@ Routes:
 - ``GET /health`` — 200 when well, 503 when the chaos switch is on.
 - ``GET /work`` — one pretend request: 200 when well, 500 when failing.
 - ``GET /metrics`` — the counters, in Prometheus text format.
+- ``GET /logs`` — the request log lines recorded so far, as JSON.
 - ``GET /chaos`` — is the chaos switch on or off?
 - ``POST /chaos/on`` — start failing.
 - ``POST /chaos/off`` — stop failing (recover).
@@ -37,7 +43,10 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+MAX_LOG_ENTRIES = 100
 
 
 class SampleService:
@@ -57,9 +66,24 @@ class SampleService:
         self.failing = failing
         self.requests_total = 0
         self.errors_total = 0
+        self.log_entries: list[dict[str, str]] = []
 
     def set_failing(self, failing: bool) -> None:
         self.failing = failing
+
+    def _record_log(self, level: str, message: str) -> None:
+        self.log_entries.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "service": self.service,
+                "namespace": self.namespace,
+                "level": level,
+                "message": message,
+            }
+        )
+        # Bounded, like every other record in this project: only
+        # the newest lines are kept.
+        del self.log_entries[:-MAX_LOG_ENTRIES]
 
     def health(self) -> tuple[int, dict[str, str]]:
         if self.failing:
@@ -71,7 +95,9 @@ class SampleService:
         self.requests_total += 1
         if self.failing:
             self.errors_total += 1
+            self._record_log("ERROR", "downstream call timed out")
             return 500, {"result": "error", "detail": "downstream call timed out"}
+        self._record_log("INFO", "checkout request completed")
         return 200, {"result": "ok"}
 
     def render_metrics(self) -> str:
@@ -130,6 +156,8 @@ def make_handler(service: SampleService) -> type[BaseHTTPRequestHandler]:
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)
+            elif self.path == "/logs":
+                self._send_json(200, {"entries": list(service.log_entries)})
             elif self.path == "/chaos":
                 self._send_json(200, {"failing": service.failing})
             else:

@@ -148,6 +148,18 @@ def test_compose_defines_all_four_services() -> None:
     assert '"8080:8080"' in compose
 
 
+def test_compose_agent_runs_the_live_factory() -> None:
+    # Phase 12: the Compose demo's agent is the live factory, so
+    # its diagnosis reads the stack's own Prometheus and sample
+    # service — named here by their Compose addresses — and not
+    # the shipped app's seeded demo data.
+    compose = _read(REPO_ROOT / "docker-compose.yml")
+    assert "sre_agent.demo_live:create_live_demo_app" in compose
+    assert "SRE_AGENT_PROMETHEUS_URL=http://prometheus:9090" in compose
+    assert "SRE_AGENT_SAMPLE_SERVICE_URL=http://sample-service:8000" in compose
+    assert "sre_agent.server:app" not in compose
+
+
 def test_prometheus_scrapes_the_sample_service_and_loads_the_rules() -> None:
     config = _read(DEMO / "prometheus" / "prometheus.yml")
     assert "sample-service:8000" in config
@@ -269,11 +281,18 @@ def test_demo_guide_matches_the_stack_as_it_runs_today() -> None:
     # and the guide must not say them again.
     assert "not** wired" not in guide
     assert "Nothing in the demo can be fixed" not in guide
+    # Phase 12: the guide once said the Compose diagnosis reads
+    # seeded demo data, not the live Prometheus numbers; that
+    # stopped being true when the demo was wired to live
+    # Prometheus, and the guide must not say it again.
+    assert "diagnosis reads seeded demo data" not in guide
+    assert "not the demo's live" not in guide
     for needle in (
         "docker compose up --build",
         "diagnosed",
         "approve",
-        "seeded demo data",
+        "live Prometheus",
+        "seeded demo workloads",
         "no Docker in the build environment",
     ):
         assert needle in guide

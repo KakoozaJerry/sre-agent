@@ -38,5 +38,22 @@ services:
 
   sre-agent:
     build: .
+    # The Compose demo runs the live factory (Phase 12): its
+    # diagnosis reads this stack's own Prometheus and sample
+    # service, not the seeded demo data the shipped app uses.
+    command:
+      - uvicorn
+      - --factory
+      - sre_agent.demo_live:create_live_demo_app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+    environment:
+      - SRE_AGENT_PROMETHEUS_URL=http://prometheus:9090
+      - SRE_AGENT_SAMPLE_SERVICE_URL=http://sample-service:8000
     ports:
       - "8080:8080"
+    depends_on:
+      - prometheus
+      - sample-service

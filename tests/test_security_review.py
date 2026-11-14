@@ -110,3 +110,29 @@ def test_cli_security_check_prints_report_and_exits_zero(capsys) -> None:  # typ
 def test_cli_security_check_rejects_extra_arguments(capsys) -> None:  # type: ignore[no-untyped-def]
     assert main(["security-check", "extra"]) == 1
     assert "no extra arguments" in capsys.readouterr().err
+
+
+# --- Phase 12 restructure: probes and their data, same import path ----------
+
+
+def test_security_review_is_a_package_split_into_probes_and_findings() -> None:
+    import sre_agent.security_review as review_pkg
+
+    assert hasattr(review_pkg, "__path__")  # a package, not one module
+
+
+def test_each_half_lives_in_its_own_module() -> None:
+    from sre_agent.security_review import findings, probes
+
+    assert findings.SECURITY_FINDINGS is SECURITY_FINDINGS
+    assert probes.run_security_review is run_security_review
+
+
+def test_package_imports_are_the_same_objects_as_the_half_modules() -> None:
+    import sre_agent.security_review as review_pkg
+    from sre_agent.security_review import findings, probes
+
+    assert review_pkg.SECURITY_FINDINGS is findings.SECURITY_FINDINGS
+    assert review_pkg.SecurityFinding is findings.SecurityFinding
+    assert review_pkg.run_security_review is probes.run_security_review
+    assert review_pkg.SecurityReport is probes.SecurityReport

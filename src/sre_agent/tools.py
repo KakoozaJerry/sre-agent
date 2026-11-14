@@ -34,6 +34,12 @@ when the demo backends are swapped for real ones. This pass ships
 the demo backends (memory, file, and a Prometheus reply parser);
 wiring a live Prometheus or Loki server plugs into the same
 interface later, exactly as the incident store worked in Phase 1.
+Phase 12 adds the live demo backends at the bottom of this file:
+metrics from a real Prometheus (``PrometheusMetricsBackend``,
+already here), service status derived from that same Prometheus
+(``PrometheusServiceStatusBackend``), and log lines recorded by
+the demo sample service itself (``SampleServiceLogsBackend``) —
+assembled for the Compose demo in ``demo_live.py``.
 """
 
 from __future__ import annotations
@@ -360,11 +366,19 @@ class PrometheusMetricsBackend:
         base_url: str,
         timeout_seconds: float = 5.0,
         allowed_hosts: list[str] | None = None,
+        allow_http_hosts: list[str] | None = None,
     ) -> None:
         self._base_url = validate_backend_url(
-            base_url, allowed_hosts=allowed_hosts, what="Prometheus address"
+            base_url,
+            allowed_hosts=allowed_hosts,
+            allow_http_hosts=allow_http_hosts,
+            what="Prometheus address",
         )
         self._timeout = timeout_seconds
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url
 
     def fetch(self, query: str) -> list[MetricSeries]:
         qs = urllib.parse.urlencode({"query": query})
@@ -584,6 +598,145 @@ class InMemoryServiceBackend:
 
 
 # ---------------------------------------------------------------------------
+# Live demo backends (Phase 12): the Compose demo's own services
+# ---------------------------------------------------------------------------
+
+# The two metric names the reasoning loop asks about. They are
+# repeated here as plain strings because a live backend must not
+# import the loop; ``reasoning.py`` holds the loop's own copies
+# and the demo-live tests pin that the names agree.
+_LIVE_ERROR_METRIC = "http_request_errors_total"
+_LIVE_REQUEST_METRIC = "http_requests_total"
+
+
+class PrometheusServiceStatusBackend:
+    """Live service status, read from a real Prometheus.
+
+    One question per metric the loop already uses: if neither
+    metric has a series for this target, the service is unknown
+    (``None``, the same normal answer the demo backend gives).
+    If the latest error value is above zero the service is
+    ``degraded``; otherwise, with a request series present, it
+    is ``healthy``. The demo has one sample container, so ready
+    and desired are honestly 1 and 1 — this backend invents no
+    replicas. A Prometheus that cannot be reached gives
+    ``None`` too, with the failure logged: a missing status
+    must never lose a diagnosis the other evidence earned.
+    """
+
+    def __init__(self, metrics: PrometheusMetricsBackend) -> None:
+        self._metrics = metrics
+
+    def get(self, target: Target) -> ServiceStatus | None:
+        try:
+            errors = self._metrics.fetch(_LIVE_ERROR_METRIC)
+            requests = self._metrics.fetch(_LIVE_REQUEST_METRIC)
+        except Exception:
+            log.exception(
+                "live Prometheus status check failed for %s; "
+                "that source is skipped",
+                target.service,
+            )
+            return None
+
+        def _latest(series: list[MetricSeries]) -> float | None:
+            values = [s.samples[-1].value for s in series if s.samples]
+            return max(values) if values else None
+
+        error_value = _latest(errors)
+        request_value = _latest(requests)
+        if error_value is None and request_value is None:
+            return None
+        errors_now = error_value or 0.0
+        requests_now = request_value or 0.0
+        return ServiceStatus(
+            service=target.service,
+            namespace=target.namespace,
+            environment=target.environment,
+            status="degraded" if errors_now > 0 else "healthy",
+            ready_replicas=1,
+            desired_replicas=1,
+            version="",
+            message=(
+                f"live Prometheus: {requests_now:g} request(s), "
+                f"{errors_now:g} error(s) for {target.service}"
+            ),
+        )
+
+
+class SampleServiceLogsBackend:
+    """Live log lines, read from the demo sample service.
+
+    The sample service records one line per request it serves
+    and serves them at ``GET /logs`` (see
+    ``demo/sample_service/app.py``). This backend fetches those
+    lines and applies the same filters the in-memory backend
+    applies. Its address passes the same rules as every live
+    backend (``backend_url.py``), with the same explicit
+    ``allow_http_hosts`` exception available for the Compose
+    network's ``sample-service`` host. A sample service that
+    cannot be reached gives no lines, with the failure logged.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        timeout_seconds: float = 5.0,
+        allow_http_hosts: list[str] | None = None,
+    ) -> None:
+        self._base_url = validate_backend_url(
+            base_url,
+            allow_http_hosts=allow_http_hosts,
+            what="sample service address",
+        )
+        self._timeout = timeout_seconds
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url
+
+    def _fetch_entries(self) -> list[LogEntry]:
+        url = f"{self._base_url}/logs"
+        with urllib.request.urlopen(url, timeout=self._timeout) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        raw: object = payload.get("entries") if isinstance(payload, dict) else payload
+        if not isinstance(raw, list):
+            return []
+        entries: list[LogEntry] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            when = datetime.now(UTC)
+            ts = item.get("timestamp")
+            if isinstance(ts, str):
+                try:
+                    when = datetime.fromisoformat(ts)
+                except ValueError:
+                    when = datetime.now(UTC)
+            entries.append(
+                LogEntry(
+                    timestamp=when,
+                    service=str(item.get("service", "unknown")),
+                    namespace=str(item.get("namespace", "default")),
+                    level=str(item.get("level", "INFO")),
+                    message=str(item.get("message", "")),
+                )
+            )
+        return entries
+
+    def search(self, request: SearchLogsRequest) -> list[LogEntry]:
+        try:
+            entries = self._fetch_entries()
+        except Exception:
+            log.exception(
+                "live sample-service log fetch failed; "
+                "that source is skipped"
+            )
+            return []
+        return [e for e in entries if _entry_matches(e, request)]
+
+
+# ---------------------------------------------------------------------------
 # The tool layer itself
 # ---------------------------------------------------------------------------
 
@@ -595,8 +748,12 @@ class ToolLayer:
     def __init__(
         self,
         metrics: InMemoryMetricsBackend | PrometheusMetricsBackend | None = None,
-        logs: InMemoryLogsBackend | FileLogsBackend | None = None,
-        services: InMemoryServiceBackend | None = None,
+        logs: (
+            InMemoryLogsBackend | FileLogsBackend | SampleServiceLogsBackend | None
+        ) = None,
+        services: (
+            InMemoryServiceBackend | PrometheusServiceStatusBackend | None
+        ) = None,
     ) -> None:
         self._metrics = metrics if metrics is not None else InMemoryMetricsBackend()
         self._logs = logs if logs is not None else InMemoryLogsBackend()

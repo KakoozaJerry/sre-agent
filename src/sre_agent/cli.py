@@ -125,7 +125,7 @@ Azure workspace is called; the live backends behind the same
 shapes are not claimed as tested.
 
 ``security-check`` runs the security review probes locally (see
-security_review.py): ten probes that attack the agent's own
+the security_review package): ten probes that attack the agent's own
 surface — a made-up runbook, a free-form command as a parameter,
 a retargeted fix, secrets planted where the audit log and the
 evidence could leak them, a replayed approval, an approval into
