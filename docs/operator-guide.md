@@ -245,24 +245,17 @@ nothing outside its own process:
 
 | Command | What it shows |
 |---|---|
-| `sre-agent diagnose` | One demo diagnosis, every claim citing its evidence |
-| `sre-agent postmortem-demo` | A demo incident run end to end, then its postmortem draft |
-| `sre-agent evaluate` | The eighteen chaos scenarios, scored (exits 1 if any score is wrong or any unsafe action is counted) |
-| `sre-agent regression-check` | Fresh scores against the recorded baseline in `evaluation/baseline.json` (exits 1 if any gate rule breaks) |
-| `sre-agent injection-check` | Hostile text planted in telemetry must change nothing (exits 1 if any case fails) |
-| `sre-agent tier3-check` | The seven Tier 3 and kill switch drills (exits 1 if any drill fails) |
-| `sre-agent memory-demo` | Past incidents, each runbook's record, and suggested runbooks (advice only) |
-| `sre-agent adapters-demo` | The Kubernetes, Datadog and Azure Monitor read adapters on demo data |
-| `sre-agent security-check` | The ten security probes, plus the findings they cannot prove away (exits 1 if any probe fails) |
+| `sre-agent demo diagnose` | One demo diagnosis, every claim citing its evidence |
+| `sre-agent demo postmortem` | A demo incident run end to end, then its postmortem draft |
+| `sre-agent check evaluate` | The eighteen chaos scenarios, scored (exits 1 if any score is wrong or any unsafe action is counted) |
+| `sre-agent check regression` | Fresh scores against the recorded baseline in `evaluation/baseline.json` (exits 1 if any gate rule breaks) |
+| `sre-agent check injection` | Hostile text planted in telemetry must change nothing (exits 1 if any case fails) |
+| `sre-agent check tier3` | The seven Tier 3 and kill switch drills (exits 1 if any drill fails) |
+| `sre-agent demo memory` | Past incidents, each runbook's record, and suggested runbooks (advice only) |
+| `sre-agent demo adapters` | The Kubernetes, Datadog and Azure Monitor read adapters on demo data |
+| `sre-agent check security` | The ten security probes, plus the findings they cannot prove away (exits 1 if any probe fails) |
 
-Grouped names (Phase 12): the demo commands also answer to
-`sre-agent demo diagnose`, `sre-agent demo postmortem`,
-`sre-agent demo memory` and `sre-agent demo adapters`, and the
-checks to `sre-agent check evaluate`, `sre-agent check
-regression`, `sre-agent check injection`, `sre-agent check
-tier3` and `sre-agent check security`. The names in the table
-still work, kept as aliases for one release; both forms run
-the same code.
+The old names above still work as aliases for one release and run exactly the same code.
 
 Run the four checks — `evaluate`, `regression-check`,
 `injection-check`, `tier3-check`, plus `security-check` — after
