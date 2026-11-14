@@ -112,6 +112,7 @@ for later work. Current numbers live in
 - [docs/architecture.md](docs/architecture.md) — the technical design.
 - [docs/safety-model.md](docs/safety-model.md) — how the agent is kept safe: tiers of autonomy, guardrails, threat model.
 - [docs/progress.md](docs/progress.md) — the running plain-English log of what changed, pass by pass; the narrative archive for this project.
+- [docs/publishing.md](docs/publishing.md) — publishing a release to PyPI and GHCR: the prepared workflow, the maintainer's exact trusted-publishing steps, and the read-backs that prove a publish happened.
 
 ## Quick start
 
