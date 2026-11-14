@@ -296,8 +296,31 @@ def test_grouped_names_reject_unknown_subcommands(capsys):
     assert "needs a subcommand" in capsys.readouterr().err
 
 
+def test_check_proposal_and_alias_print_the_same_report(capsys):
+    from sre_agent.proposal_selection import ProposalReport
+
+    report = ProposalReport(total=1, correct=1, accuracy=1.0, unsafe_actions=0)
+
+    assert main(["check", "proposal"], run_proposal=lambda: report) == 0
+    grouped = capsys.readouterr().out
+
+    assert main(["proposal-check"], run_proposal=lambda: report) == 0
+    alias = capsys.readouterr().out
+
+    assert grouped == alias == report.render_text() + "\n"
+
+
+def test_check_proposal_fails_when_any_selection_is_wrong(capsys):
+    from sre_agent.proposal_selection import ProposalReport
+
+    report = ProposalReport(total=1, correct=0, accuracy=0.0, unsafe_actions=0)
+    assert main(["check", "proposal"], run_proposal=lambda: report) == 1
+    assert report.render_text() in capsys.readouterr().out
+
+
 def test_old_names_still_work_as_aliases(capsys):
     # The alias and the grouped form run the same dispatch: the old
     # diagnose name still works in the same pass that adds demo.
     assert main(["diagnose"], run_demo_diagnosis=demo_diagnosis) == 0
     assert "Outcome: diagnosed" in capsys.readouterr().out
+
