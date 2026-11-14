@@ -281,6 +281,37 @@ def test_contributing_guide_names_the_real_checks() -> None:
         assert needle in text
 
 
+def test_contributing_setup_is_one_canonical_venv() -> None:
+    text = _read(REPO_ROOT / "CONTRIBUTING.md")
+    flat = _flat(text)
+    # Phase 12: the dev setup is one canonical block. The
+    # quickstart already makes .venv and installs the server
+    # parts; the dev install goes into that same folder. A
+    # second venv creation in the guide is the redundancy this
+    # item removed, so it must not come back.
+    setup = text.split("## Set up", 1)[1].split("## ", 1)[0]
+    assert "./quickstart.sh" in setup
+    assert '.venv/bin/python -m pip install -e ".[dev,server]"' in setup
+    assert ".venv/bin/python -m pytest" in setup
+    assert "python -m venv" not in setup
+    assert "same folder" in flat
+    # The stale five-scenario count in the checks list is gone;
+    # the suite is eighteen scenarios now.
+    assert "eighteen chaos scenarios: 18 of 18" in flat
+    assert "five chaos scenarios" not in flat
+
+
+def test_contributing_points_to_the_starter_issues() -> None:
+    text = _read(REPO_ROOT / "CONTRIBUTING.md")
+    flat = _flat(text)
+    # Phase 12: four starter issues, labelled good first issue,
+    # each saying exactly what done looks like. The guide lists
+    # all four by number, so a newcomer lands on a real issue.
+    assert "good first issue" in flat
+    for number in (1, 2, 3, 4):
+        assert f"sre-agent/issues/{number}" in text
+
+
 def test_code_of_conduct_and_templates_exist() -> None:
     conduct = _read(REPO_ROOT / "CODE_OF_CONDUCT.md")
     assert "harassment" in conduct

@@ -22,21 +22,24 @@ issue (see "Report a problem" below).
 ## Set up
 
 You need Python 3.11 or newer. From the top folder of your
-clone:
+clone, run these three commands — this is the one canonical
+dev setup:
 
 ```bash
 ./quickstart.sh
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,server]"
-pytest
+.venv/bin/python -m pip install -e ".[dev,server]"
+.venv/bin/python -m pytest
 ```
 
-The first command is the one-command install for users; the
-next three are the development install — the `dev` part brings
-the test tools, the `server` part the web server. When `pytest`
-is green you are ready. If the safety tests are red, do not
-work around them: a broken guardrail is the most important bug
-this project can have.
+Why only these three: `./quickstart.sh` already makes the
+private Python folder (`.venv`) and installs the package with
+its server parts into it. The second command installs into
+that same folder, adding the development tools — the `dev`
+part brings the test tools, the `server` part the web server.
+Do not make a second `.venv`: one folder, one install, is the
+whole setup. When `pytest` is green you are ready. If the
+safety tests are red, do not work around them: a broken
+guardrail is the most important bug this project can have.
 
 ## Run the checks
 
@@ -46,12 +49,18 @@ Every change must pass all of these before it is proposed:
 pytest                                # the full test suite, safety suite included
 ruff check src tests                  # style
 mypy src                              # types
-sre-agent evaluate                    # five chaos scenarios: 5 of 5, 0 unsafe actions
+sre-agent evaluate                    # eighteen chaos scenarios: 18 of 18, 0 unsafe actions
 sre-agent regression-check            # fresh scores vs the recorded baseline
 sre-agent injection-check             # hostile telemetry must change nothing: 8 of 8
 sre-agent tier3-check                 # Tier 3 drills and the kill switch: 7 of 7
 sre-agent security-check              # ten probes on the agent itself: 10 of 10
 ```
+
+The check commands also have grouped names — `sre-agent check
+evaluate`, `sre-agent check regression`, `sre-agent check
+injection`, `sre-agent check tier3`, `sre-agent check
+security` — and the old names above still work, kept as
+aliases for one release; both forms run exactly the same code.
 
 The regression baseline in `evaluation/baseline.json` is never
 updated as part of an ordinary change. It moves only on
@@ -135,12 +144,23 @@ report joins that record once it is fixed.
 
 ## Good first changes
 
-- Documentation fixes: a step that is unclear, a limit that is
-  stated in one place but missing in another.
-- A new test for a refusal that is described in the docs but
-  not yet pinned by a test.
-- A scenario or injection case that covers a surface the
-  suites already read, scored the same honest way.
+Four starter issues are open, each labelled
+[good first issue](https://github.com/KakoozaJerry/sre-agent/labels/good%20first%20issue).
+Each one is small enough for a newcomer, and each one says
+exactly what done looks like, in a checklist in the issue
+itself:
+
+- [Redact Azure AccountKey values in tool output](https://github.com/KakoozaJerry/sre-agent/issues/1)
+- [Add a TLS-certificate proposal-selection case that escalates](https://github.com/KakoozaJerry/sre-agent/issues/2)
+- [Give the proposal-selection suite a CLI check command](https://github.com/KakoozaJerry/sre-agent/issues/3)
+- [Update the operator guide command table to the grouped command names](https://github.com/KakoozaJerry/sre-agent/issues/4)
+
+More generally, good first changes are documentation fixes
+(a step that is unclear, a limit that is stated in one place
+but missing in another), a new test for a refusal that is
+described in the docs but not yet pinned by a test, and a
+scenario or injection case that covers a surface the suites
+already read, scored the same honest way.
 
 When in doubt, ask in an issue. A short question up front is
 cheaper than a long pull request in the wrong direction.
