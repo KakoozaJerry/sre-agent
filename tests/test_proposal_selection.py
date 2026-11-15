@@ -16,10 +16,10 @@ from sre_agent.proposal_selection import (
 )
 
 
-def test_suite_has_eight_cases_and_scores_all_correct() -> None:
+def test_suite_has_nine_cases_and_scores_all_correct() -> None:
     report = run_proposal_suite()
-    assert report.total == 8
-    assert report.correct == 8
+    assert report.total == 9
+    assert report.correct == 9
     assert report.accuracy == 1.0
     assert all(r.selection_correct for r in report.results)
 
