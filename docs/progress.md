@@ -2,6 +2,28 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 15 November 2026 (Phase 12 — the 14:04 batch was stranded, and the scheduled rerun is re-checked) — a scheduled job is only a plan while it still reads back enabled
+
+- **The previous pass's batch did not land.** Its push card timed out (requested 19:10Z, decided timed out 20:04Z) with no card pending, the public head is still 08f5faf, and reading the public plan and progress log back shows they differ from the local copies by exactly the 14:04 entries. This pass's batch carries them again, together with this pass's entry.
+- **The scheduled rerun still stands, re-checked this pass.** Both one-off jobs were read back enabled again: one launches the real-model score run on Monday 16 November at 00:50 Pacific, just after the free key's daily quota resets at midnight, and one collects and publishes on Monday at 08:55 Pacific — writing the docs only if the results file is complete and clean. This pass made no Gemini calls and started no run of its own. The scenario-suite item stays unchecked until a measured score is read back.
+- **One plain lesson about scheduled work.** A scheduled job is only a plan while it still reads back enabled. Each pass before a one-off launch re-reads both jobs, so a missing or disabled job is caught while there is still time to fix it — not at launch time, when it would be too late.
+- **Pull request #6 has not moved for a nineteenth pass in a row, so its verification still stands.** Its head is still a10249d — exactly the head verified in full earlier (474 tests, the new check command and its alias both at 9 of 9). It waits on Abraham's merge only, and merging it will close issue #3, the only open issue. On the main line, `sre-agent check proposal` still exits 2; the main line's proposal score (9 of 9) is measured by running the suite itself.
+- **Discussions stays enabled** (its address answers 200, read back live), and the hosted demo is healthy (health check ok, front page 200).
+- Everything verified from a clean copy in full, with the whole run kept in one log file: 473 tests pass (the extra one is the scoring work's preparation test, which is in the local tree and belongs to that work, so it is not part of this pass's upload), style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9, 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
+## 15 November 2026 (Phase 12 — the pick is made and the rerun is scheduled) — a pick made between passes is already a plan fact
+
+- **The previous pass's batch landed.** The public head is 08f5faf, read back this pass, and the public plan and progress log match the local copies exactly, so nothing is carried this time.
+- **Abraham picked the scheduled rerun, and it is set.** Two one-off jobs sit under this project, read back enabled this pass: one launches the real-model score run on Monday 16 November at 00:50 Pacific, just after the free key's daily quota resets at midnight, and one collects and publishes on Monday at 08:55 Pacific — writing the docs only if the results file is complete and clean. No other Gemini use happens that day, and this pass made no Gemini calls at all. The scenario-suite item stays unchecked until a measured score is read back; no hourly pass starts a run of its own meanwhile.
+- **One plain lesson about picks between passes.** A choice Abraham makes in the main chat is already a fact of the plan, even before any hourly pass writes it down. The next pass checks the scheduled jobs before repeating that a pick is awaited — a plan that still says "awaited" after the work is scheduled would mislead every later reader.
+- **Pull request #6 has not moved for an eighteenth pass in a row, so its verification still stands.** Its head is still a10249d — exactly the head verified in full earlier (474 tests, the new check command and its alias both at 9 of 9). It waits on Abraham's merge only, and merging it will close issue #3, the only open issue. On the main line, `sre-agent check proposal` still exits 2; the main line's proposal score (9 of 9) is measured by running the suite itself.
+- **Discussions stays enabled** (its address answers 200, read back live), and the hosted demo is healthy (health check ok, front page 200).
+- Everything verified from a clean copy in full, with the whole run kept in one log file: 473 tests pass (the extra one is the scoring work's preparation test, which is in the local tree and belongs to that work, so it is not part of this pass's upload), style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9, 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
 ## 15 November 2026 (Phase 12 — the scoring rerun hit the free quota, and the last batch was stranded again) — a quota failure measures the key, not the model
 
 - **The previous pass's batch did not land.** Its push card timed out (requested 17:09Z, decided timed out 18:04Z), the public head is still 71a95f3, and reading the public plan and progress log back shows they differ from the local copies by exactly the one carried entry. This pass's batch carries it again, together with this pass's entry.
