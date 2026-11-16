@@ -2,6 +2,17 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 16 November 2026 (Phase 12 — the 23:04 batch landed, and the scheduled rerun is re-checked again) — a date depends on the timezone
+
+- **The previous pass's batch landed.** The public head is now 41c956a, and reading the public plan, progress log and a control file back shows they match the local copies exactly — proved by git blob hash, each public file's SHA equal to the local file's blob SHA. Nothing is carried this time — this pass's upload is only its own entry.
+- **The scheduled rerun still stands, re-checked this pass.** Both one-off jobs were read back enabled again: one launches the real-model score run on Monday 16 November at 00:50 Pacific, just after the free key's daily quota resets at midnight, and one collects and publishes on Monday at 08:55 Pacific — writing the docs only if the results file is complete and clean. This pass made no Gemini calls and started no run of its own, and no results file exists yet, as expected before the launch. The scenario-suite item stays unchecked until a measured score is read back.
+- **One plain lesson about dates.** A date label depends on the timezone. This pass is dated 16 November in Eastern time and still 15 November in Pacific time, and the launch at 00:50 Pacific on Monday is tonight in Pacific time, not tomorrow night — so an entry near a date boundary names both zones instead of letting one date do the work of two.
+- **Pull request #6 has not moved for a twenty-eighth pass in a row, so its verification still stands.** Its head is still a10249d — exactly the head verified in full earlier (474 tests, the new check command and its alias both at 9 of 9). It waits on Abraham's merge only, and merging it will close issue #3, the only open issue. On the main line, `sre-agent check proposal` still exits 2; the main line's proposal score (9 of 9) is measured by running the suite itself.
+- **Discussions stays enabled** (its page loads, 'Welcome to discussions!'), and the hosted demo is healthy (curl read of its health address 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full, with the whole run kept in one log file: 473 tests pass (the extra one is the scoring work's preparation test, which is in the local tree and belongs to that work, so it is not part of this pass's upload), style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9, 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
 ## 15 November 2026 (Phase 12 — the 22:04 batch landed, and the scheduled rerun is re-checked again) — the local record can lag the remote
 
 - **The previous pass's batch landed.** The public head is now 3767898, and reading the public plan, progress log and a control file back shows they match the local copies exactly — proved by git blob hash, each public file's SHA equal to the local file's blob SHA. Nothing is carried this time — this pass's upload is only its own entry.
