@@ -2,6 +2,29 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 17 November 2026 (Phase 12 — a run is closed by its collect step) — the attempt is formally closed, no score
+
+- **The collect step has run, and its word is final for this attempt.** It fired at 08:50 Pacific, finished well as a job, and now reads back switched off — spent, as a one-off job is after its work. Its report is plain: no score. There is no results file, the runner is gone, the watchdog had already found it gone at 03:50 Pacific, and the run log is final at 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error). It published nothing and changed no files, exactly as its clean-results-only rules require.
+- **The last batch did not land.** Its push card was requested at 16:16 UTC and decided timed out at 17:25 UTC, no card is waiting now, and the public head is still the same commit. This pass checked the carry the careful way again: the public plan and progress log differ from the local copies only by the last pass's entry — the progress log by additions only, 11 lines added, none removed. This pass's batch carries it again — still the same two files.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The dead run's signs hold, checked fresh once more.** The log, the missing process and the missing results file all match the collect step's report. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about closing a run.** A run is closed by its collect step, not by repetition. The hourly passes may re-check a dead run's signs, but the attempt's formal finding is the collect step's report; once that step has run, finished well, and read back spent, later passes cite its report instead of re-judging the run.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
+## 17 November 2026 (Phase 12 — a push is landed when the public head moves) — the stranded streak ended, the collect step is next
+
+- **The last batch landed.** The public head is now a new commit, f28ee1a, and the public plan and progress log read back identical to the local copies. Nothing is carried forward in this pass's batch — a first after a run of stranded batches.
+- **The repository is quiet, as it should be.** It was read back with no open pull requests, and the issues list returns only closed issues. The first contributor's four pieces stay complete.
+- **The dead run's signs hold again.** The run log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. There is no score. The collect-and-publish step at 08:50 Pacific is still switched on, has not run yet, and owns the formal report. This pass restarted nothing and made no calls of its own; starting the run again is Abraham's decision.
+- **One plain lesson about pushing.** A push is only landed when the public head moves and the pushed files read back identical to the local copies. A card timeout in the pass that sent a batch is not proof that batch failed — it can still land before the next pass checks, as this one did.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
 ## 17 November 2026 (Phase 12 — the 09:04 batch was stranded too, and a fresh machine changes no sign) — six entries carried, the collect step is next
 
 - **The last batch did not land either.** Its push card was requested at 14:10 UTC and decided timed out at 15:22 UTC, no card is waiting now, and the public head is still the same commit. The public plan and progress log differ from the local copies only by the last six passes' entries — the progress log by additions only, 68 lines added, none removed. This pass's batch carries all six again — still the same two files.
