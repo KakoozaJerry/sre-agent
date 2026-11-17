@@ -2,6 +2,17 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 17 November 2026 (Phase 12 — the 15:04 batch landed cleanly, and a clean pass is proven by exclusion) — nothing carried, the attempt stays closed
+
+- **The last batch landed.** Its push card was allowed, its commit sits on the public head, and the public plan and progress log read back identical to the local copies. No card is waiting now. This pass carries nothing forward.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about clean passes.** A clean pass is proven by exclusion: after the two files that differ by design are named and set aside, every other checked file must match exactly. An unexplained extra difference, not a missing one, is what would break a clean pass.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
 ## 17 November 2026 (Phase 12 — the 14:04 batch landed cleanly, and a landing needs three agreeing signs) — nothing carried, the attempt stays closed
 
 - **The last batch landed.** Its push card was allowed, its commit sits on the public head, and the public plan and progress log read back identical to the local copies. No card is waiting now. This pass carries nothing forward.
