@@ -13,6 +13,7 @@ terminal:
     sre-agent check evaluate
     sre-agent check regression [--baseline PATH] [--update-baseline]
     sre-agent check injection
+    sre-agent check proposal
     sre-agent check tier3
     sre-agent check security
     sre-agent --version
@@ -20,9 +21,10 @@ terminal:
 The demo commands and the scored checks also answer to their
 old names — ``diagnose``, ``approve-demo``, ``postmortem-demo``,
 ``memory-demo``, ``adapters-demo``, ``evaluate``,
-``regression-check``, ``injection-check``, ``tier3-check`` and
-``security-check`` — kept as aliases for one release (Phase 12).
-The product commands, ``incidents`` and ``show``, did not move.
+``regression-check``, ``injection-check``, ``proposal-check``,
+``tier3-check`` and ``security-check`` — kept as aliases for one
+release (Phase 12). The product commands, ``incidents`` and
+``show``, did not move.
 
 How it works, honestly:
 
@@ -95,6 +97,14 @@ diagnosis repeats its orders, no action runs, and the answer is
 the one the honest numbers give. It exits 1 when any case fails
 or any unsafe action is counted.
 
+``proposal-check`` runs the proposal-selection suite locally
+(see proposal_selection.py): each case diagnoses one chaos
+scenario for real, then the selector scores which fix that
+diagnosis points to. It exits 1 when any selection is wrong or
+any unsafe action is counted. It is a check only: it runs
+nothing, proposes nothing through the policy engine, and
+approves nothing.
+
 ``tier3-check`` runs the Tier 3 drill set locally (see
 tier3.py): seven rehearsed checks on the demo environment's
 bounded-autonomy grant. The pre-approved fixes (restart and
@@ -158,6 +168,7 @@ from .memory import MemoryReport, demo_memory
 from .models import Incident, IncidentStatus, Target
 from .policy import EnvironmentPolicy, Tier
 from .postmortems import PostmortemDraft, demo_postmortem
+from .proposal_selection import ProposalReport, run_proposal_suite
 from .reasoning import DiagnosisReport, demo_diagnosis
 from .regression import (
     DEFAULT_BASELINE_PATH,
@@ -210,6 +221,13 @@ USAGE = """Usage:
                                          must change nothing (exit 1 if any
                                          case fails or any unsafe action
                                          is counted)
+  sre-agent proposal-check               Run the proposal-selection suite:
+                                         given each diagnosis, which fix
+                                         it points to (or escalate). Exits
+                                         1 if any selection is wrong or
+                                         any unsafe action is counted;
+                                         check only, runs/proposes/
+                                         approves nothing
   sre-agent tier3-check                  Run the Tier 3 drill set on the
                                          demo grant: pre-approved fixes
                                          run, everything outside the grant
@@ -244,6 +262,7 @@ USAGE = """Usage:
   sre-agent check evaluate               Same as: evaluate
   sre-agent check regression             Same as: regression-check
   sre-agent check injection              Same as: injection-check
+  sre-agent check proposal               Same as: proposal-check
   sre-agent check tier3                  Same as: tier3-check
   sre-agent check security               Same as: security-check
   sre-agent --version                    Print the version
@@ -630,6 +649,8 @@ CHECK_COMMANDS: dict[str, str] = {
     "regression-check": "regression-check",
     "injection": "injection-check",
     "injection-check": "injection-check",
+    "proposal": "proposal-check",
+    "proposal-check": "proposal-check",
     "tier3": "tier3-check",
     "tier3-check": "tier3-check",
     "security": "security-check",
@@ -670,6 +691,7 @@ def main(
     run_demo_postmortem: Callable[[], PostmortemDraft] | None = None,
     run_suite: Callable[[], EvaluationReport] | None = None,
     run_injection: Callable[[], InjectionReport] | None = None,
+    run_proposal: Callable[[], ProposalReport] | None = None,
     run_drills: Callable[[], Tier3Report] | None = None,
     run_demo_memory: Callable[[], MemoryReport] | None = None,
     run_demo_adapters: Callable[[], AdaptersDemoReport] | None = None,
@@ -727,6 +749,18 @@ def main(
             if (
                 injection_report.passed_count != injection_report.total
                 or injection_report.unsafe_actions
+            ):
+                return 1
+            return 0
+        if command == "proposal-check":
+            if rest:
+                raise CliError("proposal-check takes no extra arguments")
+            check_proposal = run_proposal or run_proposal_suite
+            proposal_report = check_proposal()
+            print(proposal_report.render_text())
+            if (
+                proposal_report.correct != proposal_report.total
+                or proposal_report.unsafe_actions
             ):
                 return 1
             return 0
