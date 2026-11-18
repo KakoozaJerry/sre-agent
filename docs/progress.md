@@ -2,6 +2,66 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 18 November 2026 (Phase 12 — four batches timed out in a row, and the carry is still one push of the current files) — four entries carried, the attempt stays closed
+
+- **The last four batches did not land.** The newest push card was requested at 14:10 UTC and decided timed out at 14:14 UTC — about four and a half minutes — no card is waiting now, and the public head is still the same commit. The public plan and progress log differ from the local copies only by the last four passes' entries — the progress log by additions only, 48 lines added, none removed. This pass's batch carries all four entries again — still the same two files, pushed once.
+- **The push record's lag did not grow.** The local record of pushes still ends at the same older commit, still three commits behind the head, because no timeout landed anything.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about four stranded batches.** Four stranded batches change the count, not the method: the carry is still one combined push of the current files, counted from the public-to-local difference, never from the number of timed-out cards — and the timeouts' durations still do not matter, only the decision read back does.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
+## 18 November 2026 (Phase 12 — three batches timed out in a row, and one push of the current files carries all three entries at once) — three entries carried, the attempt stays closed
+
+- **The last three batches did not land.** The newest push card was requested at 13:11 UTC and decided timed out at 13:52 UTC — about forty-one minutes, after the card before it timed out in under three — no card is waiting now, and the public head is still the same commit. The public plan and progress log differ from the local copies only by the last three passes' entries — the progress log by additions only, 36 lines added, none removed. This pass's batch carries all three entries again — still the same two files, pushed once.
+- **The push record's lag did not grow.** The local record of pushes still ends at the same older commit, still three commits behind the head, because no timeout landed anything.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about three stranded batches.** Three stranded batches still carry as one combined push of the current files: count the carry from the public-to-local difference, not from the number of timed-out cards, and never triple-count three timeouts as three separate resends — one push of the current files carries all three entries at once.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
+## 18 November 2026 (Phase 12 — two batches timed out in a row, and a fast timeout strands a batch the same as a slow one) — two entries carried, the attempt stays closed
+
+- **The last two batches did not land.** The newest push card was requested at 12:10 UTC and decided timed out at 12:13 UTC — under three minutes, where earlier cards took about forty — no card is waiting now, and the public head is still the same commit. The public plan and progress log differ from the local copies only by the last two passes' entries — the progress log by additions only, 24 lines added, none removed. This pass's batch carries both entries again — still the same two files.
+- **The push record's lag did not grow.** The local record of pushes still ends at the same older commit, still three commits behind the head, because neither timeout landed anything.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about two stranded batches.** Two stranded batches carry exactly like one: count the carry from the public-to-local difference, not from the number of timed-out cards, and a fast timeout strands a batch the same as a slow one — the decision read back is what counts, not how long it took.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
+## 18 November 2026 (Phase 12 — the 06:04 batch timed out, and a timeout grows the carry but not the lag) — one entry carried, the attempt stays closed
+
+- **The last batch did not land.** Its push card was requested at 11:10 UTC and decided timed out at 11:50 UTC, no card is waiting now, and the public head is still the same commit. The public plan and progress log differ from the local copies only by the last pass's entry — the progress log by additions only, 12 lines added, none removed. This pass's batch carries that entry again — still the same two files.
+- **The push record's lag did not grow.** The local record of pushes still ends at the same older commit, still three commits behind the head, because a timeout landed nothing. The lag counts landed commits, not attempted pushes, so it stays where it was while the carry grows by one.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about a timeout and a lag.** A timed-out batch grows the carry but moves neither the head nor the record's lag. Count the lag from landed commits only; count the carry from the public-to-local difference.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
+## 18 November 2026 (Phase 12 — the 05:04 batch landed, and three landings still leave the push record untouched) — no entry carried, the attempt stays closed
+
+- **The last batch landed.** Its push was approved, the public head is a new commit, and the public plan and progress log read back exactly the same as the local copies. No card is waiting now, so this pass carries nothing forward.
+- **The push record still lags — now by three.** The local record of pushes still ends at the same older commit. Three commits have landed since that entry and none of them updated the record, so the gap only grows until the record itself is fixed on purpose. That lag is not a carry and does not hold the batch; it is stated alongside the closed carry.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about the record.** A landing never repairs the local record. Fixing it is separate local bookkeeping, done apart from the pushed batch — the record itself is never one of the pushed files.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
 ## 18 November 2026 (Phase 12 — the 04:04 batch landed, the carry is closed, and a lagging record's count is counted fresh) — no entry carried, the attempt stays closed
 
 - **The last batch landed.** Its push was approved, the public head is a new commit, and the public plan and progress log read back exactly the same as the local copies. No card is waiting now. The two entries the last passes carried are public, so this pass carries nothing forward.
