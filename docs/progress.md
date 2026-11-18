@@ -2,6 +2,17 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 17 November 2026 (Phase 12 — the carried batch landed late, and a landed carry resets to zero) — nothing carried, the attempt stays closed
+
+- **The carried batch landed, after its own pass had closed.** The public head is a new commit dated after that pass ended, its message names the sending pass, no card is waiting now, and the public plan and progress log read back identical to the local copies. The two entries it carried are closed completely. This pass carries nothing forward, and it does not push those files again for that batch.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about a landed carry.** A landed carry resets to zero. When a batch carrying several stranded entries lands late, the next pass proves the reset by a zero difference on both pushed files, not by the head move alone. Any remaining difference would be a partial landing, and only that remainder would be carried.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
 ## 17 November 2026 (Phase 12 — two batches in a row were stranded, and a carry is counted in entries, not in cards) — two entries carried, the attempt stays closed
 
 - **The last two batches did not land.** Both push cards timed out — the newest was requested at 23:10 UTC and decided timed out at 23:51 UTC — no card is waiting now, and the public head is still the same commit. The public plan and progress log differ from the local copies only by the last two passes' entries — the progress log by additions only, 22 lines added, none removed. This pass's batch carries both entries again — still the same two files, with all three entries together.
