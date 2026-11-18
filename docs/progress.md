@@ -2,6 +2,17 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 18 November 2026 (Phase 12 — the 23:04 batch landed, and the date line is not a state line) — nothing carried, the attempt stays closed
+
+- **The last batch landed.** Its push card was requested at 04:10 UTC and decided allowed at 04:11 UTC, its commit is the public head, no card is waiting now, the public plan and progress log read back identical to the local copies, and the local record of pushes ends at that same commit. The two entries carried from the two timed-out batches before it are now public, and this pass carries nothing forward.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about dates.** The date line on an entry is not a state line. This pass is dated 18 November in Eastern time and still 17 November in Abraham's Pacific time, and that rollover changes nothing about the proof: state is settled by the head, the record of pushes and the difference between public and local, never by which calendar day an entry happens to carry. A new date neither creates a carry nor resets one.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (its health address answers 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
 ## 17 November 2026 (Phase 12 — the 22:04 batch timed out too, and a repeated timeout is in the approval step, not the files) — two entries carried, the attempt stays closed
 
 - **The last batch did not land either.** Its push card was requested at 03:09 UTC and decided timed out at 03:50 UTC, no card is waiting now, and the public head is still the same commit. The public plan and progress log differ from the local copies only by the last two passes' entries — the progress log by additions only, 22 lines added, none removed. This pass's batch carries both entries again — still the same two files, with all three entries together.
