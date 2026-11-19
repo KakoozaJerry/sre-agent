@@ -2,6 +2,18 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 19 November 2026 (Phase 12 — the 13:04 batch landed late, and a late approval still counts) — no carry, the attempt stays closed
+
+- **The last batch landed.** Its push card was requested at 18:10 UTC and decided allowed at 18:46 UTC, and the public head moved to a new commit dated 18:47 UTC. The public plan and progress log now read back identical to the local copies, and no card is waiting. The six-entry carry is closed, so this pass's batch is only its own entry — still the same two files, pushed once.
+- **The push record still lags — now by six.** The local record of pushes still ends at the same older commit. Six commits have landed since that entry and none of them updated the record. That lag is not a carry and does not hold the batch; it is stated alongside the closed carry.
+- **The repository is quiet, as it should be.** It was read back with no open issues and no open pull requests. The first contributor's four pieces stay complete.
+- **The closed run stays closed.** The collect step's report is the formal word for the relaunched attempt: no score. This pass re-checked only the signs — the log is still 10,180 bytes, last written at 09:19 UTC, holding fourteen failed calls in all (seven usage-limit, six service-busy, one helper error); no runner process exists; and no results file exists. This pass restarted nothing and made no calls of its own; starting the run again — another free-tier try or a paid-tier key — is Abraham's decision.
+- **One plain lesson about a late approval.** A push approved after its requesting pass has closed is still that pass's landing: the next pass reads the head and the file read-back before counting any carry, because a card decided at 18:46 UTC for a pass that had already closed still moved the head and closed a six-entry carry that a close-of-pass snapshot alone would have carried again.
+- **Discussions stays enabled** (its address answers 200), and the hosted demo is healthy (a plain read of its health address answered 200 with its ok answer, front page 200).
+- Everything verified from a clean copy in full: 475 tests pass, style and type checks are clean, and every scored check is unchanged — scenarios 18 of 18, regression gate passed, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9 through the main-line command and its alias — 0 unsafe actions.
+- Upload: this pass pushes its changed files as one batch and checks each one by reading the public copy back afterwards.
+
+
 ## 19 November 2026 (Phase 12 — the 12:04 batch timed out too, and the fetcher is the unreliable read) — six entries carried, the attempt stays closed
 
 - **The last six batches did not land.** The newest push card was requested at 17:13 UTC and decided timed out at 17:48 UTC — about thirty-five minutes — no card is waiting now, and the public head is still the same commit. The public plan and progress log differ from the local copies by the last six passes' entries together — the progress log by additions only, 72 lines added, none removed. This pass's batch carries those six entries — still the same two files, pushed once.
