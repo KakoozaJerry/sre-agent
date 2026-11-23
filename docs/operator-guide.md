@@ -135,6 +135,26 @@ it too, from its webhook receiver's `http_config`. Keep the
 token out of the repository and out of logs — it is a shared
 secret, not a configuration detail.
 
+### Give approvers their own credentials
+
+Approving is a separate credential from the API token: the API
+token proposes, it cannot approve. Each approver gets their own
+token, bound to their name, set before the server starts as a
+JSON object:
+
+```bash
+SRE_AGENT_APPROVER_TOKENS='{"<approver-token>":"<approver name>"}' \
+  uvicorn sre_agent.server:app --port 8080
+```
+
+The approve and reject endpoints then require that credential
+in the `X-SRE-Agent-Approver-Token` header, and the name written
+to the audit log is the name bound to the credential presented —
+a name claimed in a request body is never recorded. With no
+approver credentials set, those two endpoints refuse and
+approvals are disabled; a server that should hold approvals
+must be given its approvers.
+
 Send a test alert by hand:
 
 ```bash
@@ -409,12 +429,12 @@ curl -X POST http://localhost:8080/incidents/<incident-id>/actions \
 # 2. See what is waiting on that incident.
 curl http://localhost:8080/incidents/<incident-id>/approvals
 
-# 3. Approve it, by name — or reject it the same way, at
-#    .../reject. The approved fix then runs, once.
+# 3. Approve it with your approver credential — or reject it
+#    the same way, at .../reject. The approved fix then runs,
+#    once.
 curl -X POST \
   http://localhost:8080/incidents/<incident-id>/approvals/<pending-id>/approve \
-  -H 'Content-Type: application/json' \
-  -d '{"by":"<your name>"}'
+  -H 'X-SRE-Agent-Approver-Token: <approver-token>'
 ```
 
 What to know before you approve:
@@ -425,11 +445,13 @@ What to know before you approve:
 - Only a diagnosed incident can have a fix proposed. A server
   built with no policy or no runbook backend holds no
   approvals at all, and these routes answer `409` saying so.
-- The rules are the demo rules above, unchanged: named
-  approver, 15-minute expiry, one use only (a failed run
-  spends the approval too), and the policy engine decides
-  again at approval time — a halt set after the proposal
-  makes the approval fail, and that refusal is audited.
+- The rules are the demo rules above, unchanged: an approver
+  authenticated by their own credential (the name recorded is
+  the one bound to it), 15-minute expiry, one use only (a
+  failed run spends the approval too), and the policy engine
+  decides again at approval time — a halt set after the
+  proposal makes the approval fail, and that refusal is
+  audited.
 - A successful run is written on the incident as evidence and
   moves it to "mitigating". It does **not** mark the incident
   resolved: the server has not checked the fix worked, so

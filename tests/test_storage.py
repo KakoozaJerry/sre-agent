@@ -26,7 +26,7 @@ from sre_agent.ingestion import (
 from sre_agent.models import IncidentStatus
 from sre_agent.policy import EnvironmentPolicy, Tier
 from sre_agent.runbooks import demo_runbooks
-from sre_agent.server import create_app
+from sre_agent.server import APPROVER_TOKEN_HEADER, create_app
 from sre_agent.storage import SQLiteIncidentStore
 from sre_agent.tools import demo_tool_layer
 
@@ -63,10 +63,14 @@ def _policy() -> EnvironmentPolicy:
     )
 
 
+APPROVER_HEADERS = {APPROVER_TOKEN_HEADER: "approver-token"}
+
+
 def _server(store: IncidentStore, backend) -> TestClient:
     return TestClient(
         create_app(
             store,
+            approver_tokens={"approver-token": "Abraham"},
             tool_layer=demo_tool_layer(),
             approval_policy=_policy(),
             runbook_backend=backend,
@@ -221,7 +225,7 @@ def test_a_pending_approval_survives_a_restart_and_runs_once(
 
     approved = client2.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert approved.status_code == 200
     assert approved.json()["incident_status"] == "mitigating"
@@ -239,7 +243,7 @@ def test_a_pending_approval_survives_a_restart_and_runs_once(
     assert listed[0]["status"] == "approved"
     again = client3.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert again.status_code == 409
     found = client3.get(f"/incidents/{incident_id}").json()
@@ -266,7 +270,7 @@ def test_a_rejected_approval_stays_rejected_after_a_restart(tmp_path: Path):
     ).json()["pending"]
     rejected = client.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/reject",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert rejected.status_code == 200
     store.close()
@@ -277,7 +281,7 @@ def test_a_rejected_approval_stays_rejected_after_a_restart(tmp_path: Path):
     assert listed[0]["status"] == "rejected"
     late = client2.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert late.status_code == 409
     reopened_store.close()

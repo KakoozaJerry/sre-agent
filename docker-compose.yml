@@ -52,6 +52,10 @@ services:
     environment:
       - SRE_AGENT_PROMETHEUS_URL=http://prometheus:9090
       - SRE_AGENT_SAMPLE_SERVICE_URL=http://sample-service:8000
+      # Approver credentials for the demo's approval flow, set in
+      # the shell or a .env file (see docs/demo.md); empty means
+      # the approve endpoints stay disabled.
+      - SRE_AGENT_APPROVER_TOKENS=${SRE_AGENT_APPROVER_TOKENS:-}
     ports:
       - "8080:8080"
     depends_on:

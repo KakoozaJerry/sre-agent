@@ -78,8 +78,9 @@ curl http://localhost:8080/incidents
    diagnosis and the evidence behind it. (This live wiring
    carries no seeded past-incident advice — advice in this
    mode would have to be live too, or not present.)
-3. **Propose the restart, and approve it by name.** The shipped
-   server runs under a Tier 2 policy, so a fix waits for a person:
+3. **Propose the restart, and approve it with an approver
+   credential.** The shipped server runs under a Tier 2 policy,
+   so a fix waits for a person:
 
    ```bash
    curl -X POST http://localhost:8080/incidents/<id>/actions \
@@ -87,14 +88,18 @@ curl http://localhost:8080/incidents
      -d '{"runbook_id":"restart-workload"}'
    ```
 
-   The reply names a pending approval. Approve that exact action
-   under your own name:
+   The reply names a pending approval. Approving takes the
+   approver's own credential, never a name typed into the
+   request: before you started the stack, you set one approver
+   in the shell — `SRE_AGENT_APPROVER_TOKENS='{"visitor-token":
+   "Your Name"}'` — and Compose passed it to the agent (without
+   it, the approve endpoints stay disabled). Approve that exact
+   action with it:
 
    ```bash
    curl -X POST \
      http://localhost:8080/incidents/<id>/approvals/<pending-id>/approve \
-     -H 'Content-Type: application/json' \
-     -d '{"by":"Your Name"}'
+     -H 'X-SRE-Agent-Approver-Token: visitor-token'
    ```
 
    The restart runs — against the seeded demo workloads, not the

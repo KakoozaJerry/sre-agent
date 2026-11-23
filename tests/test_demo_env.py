@@ -226,53 +226,70 @@ def _stack_payload(status: str) -> dict:
     }
 
 
-def test_the_stack_server_runs_the_whole_visitor_path() -> None:
+def test_the_stack_server_runs_the_whole_visitor_path(monkeypatch) -> None:
+    import importlib
+
     from fastapi.testclient import TestClient
 
-    from sre_agent.server import app as shipped_app
+    import sre_agent.server as server_module
 
-    client = TestClient(shipped_app)
-    received = client.post(
-        "/webhooks/alertmanager", json=_stack_payload("firing")
-    ).json()
-    assert received["results"][0]["created"] is True
-    incident_id = received["results"][0]["incident_id"]
-
-    # The alert arrives diagnosed, not just recorded: the server
-    # the Compose file runs diagnoses from the seeded demo data.
-    incident = client.get(f"/incidents/{incident_id}").json()
-    assert incident["status"] == "diagnosed"
-    assert incident["diagnosis"]
-    assert incident["evidence"]
-
-    # The restart waits for a person, under the shipped Tier 2
-    # policy, and runs only when approved by name.
-    proposed = client.post(
-        f"/incidents/{incident_id}/actions",
-        json={"runbook_id": "restart-workload"},
+    # The shipped app's approve endpoints stay disabled until the
+    # operator configures approver credentials (finding S2); the
+    # demo stack's operator sets one visitor credential, as the
+    # demo guide describes. The shipped app is built at import
+    # time, so set it and rebuild, then restore the plain module
+    # for the other tests.
+    monkeypatch.setenv(
+        server_module.ENV_APPROVER_TOKENS, '{"visitor-token": "A Visitor"}'
     )
-    assert proposed.status_code == 201
-    body = proposed.json()
-    assert body["decision"] == "require_approval"
-    pending = body["pending"]
-    assert pending["runbook_id"] == "restart-workload"
-    approved = client.post(
-        f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "A Visitor"},
-    )
-    assert approved.status_code == 200
-    incident = client.get(f"/incidents/{incident_id}").json()
-    assert incident["status"] == "mitigating"
+    importlib.reload(server_module)
+    try:
+        client = TestClient(server_module.app)
+        received = client.post(
+            "/webhooks/alertmanager", json=_stack_payload("firing")
+        ).json()
+        assert received["results"][0]["created"] is True
+        incident_id = received["results"][0]["incident_id"]
 
-    # The resolved alert -- send_resolved is on in the demo's
-    # Alertmanager config -- closes the incident.
-    closed = client.post(
-        "/webhooks/alertmanager", json=_stack_payload("resolved")
-    ).json()
-    assert closed["results"][0]["resolved"] is True
-    incident = client.get(f"/incidents/{incident_id}").json()
-    assert incident["status"] == "resolved"
+        # The alert arrives diagnosed, not just recorded: the server
+        # the Compose file runs diagnoses from the seeded demo data.
+        incident = client.get(f"/incidents/{incident_id}").json()
+        assert incident["status"] == "diagnosed"
+        assert incident["diagnosis"]
+        assert incident["evidence"]
 
+        # The restart waits for a person, under the shipped Tier 2
+        # policy, and runs only when approved with the approver
+        # credential the operator configured.
+        proposed = client.post(
+            f"/incidents/{incident_id}/actions",
+            json={"runbook_id": "restart-workload"},
+        )
+        assert proposed.status_code == 201
+        body = proposed.json()
+        assert body["decision"] == "require_approval"
+        pending = body["pending"]
+        assert pending["runbook_id"] == "restart-workload"
+        approved = client.post(
+            f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
+            headers={server_module.APPROVER_TOKEN_HEADER: "visitor-token"},
+        )
+        assert approved.status_code == 200
+        assert approved.json()["approved_by"] == "A Visitor"
+        incident = client.get(f"/incidents/{incident_id}").json()
+        assert incident["status"] == "mitigating"
+
+        # The resolved alert -- send_resolved is on in the demo's
+        # Alertmanager config -- closes the incident.
+        closed = client.post(
+            "/webhooks/alertmanager", json=_stack_payload("resolved")
+        ).json()
+        assert closed["results"][0]["resolved"] is True
+        incident = client.get(f"/incidents/{incident_id}").json()
+        assert incident["status"] == "resolved"
+    finally:
+        monkeypatch.delenv(server_module.ENV_APPROVER_TOKENS)
+        importlib.reload(server_module)
 
 def test_demo_guide_matches_the_stack_as_it_runs_today() -> None:
     guide = _read(REPO_ROOT / "docs" / "demo.md")

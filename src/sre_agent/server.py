@@ -20,9 +20,11 @@ Endpoints, in plain words:
 - ``GET /incidents/{id}/approvals`` — the pending approvals held
   for one incident, with their state.
 - ``POST /incidents/{id}/approvals/{pending_id}/approve`` — one
-  named human approves one pending action; it then runs, once.
+  authenticated approver approves one pending action; it then
+  runs, once.
 - ``POST /incidents/{id}/approvals/{pending_id}/reject`` — one
-  named human turns one pending action down; nothing runs.
+  authenticated approver turns one pending action down; nothing
+  runs.
 
 Authentication (security finding F-01, fixed after v0.1.0): set the
 ``SRE_AGENT_API_TOKEN`` environment variable (or pass ``auth_token``
@@ -35,6 +37,20 @@ operator on their own machine, and only for that. Before the server
 is shared with anyone else, set a token. Alertmanager can send the
 header too (its webhook receiver's ``http_config``), and the CLI
 sends it automatically when the same environment variable is set.
+
+Approver authentication (finding S2, fixed after the 2026-11-22
+review): approving is a separate credential from the API token.
+Each approver has their own token, bound to their name by the
+operator (pass ``approver_tokens`` to :func:`create_app`, or set
+``SRE_AGENT_APPROVER_TOKENS`` to a JSON object mapping tokens to
+names). The approve and reject endpoints require that credential
+in the ``X-SRE-Agent-Approver-Token`` header, and the name written
+to the audit log is the name bound to the credential presented —
+never a name the request merely claims, so the API token alone
+cannot approve anything and an approval cannot be recorded under
+someone else's name. With no approver credentials configured, the
+approve and reject endpoints refuse: approvals are disabled until
+an operator configures who may approve.
 
 Diagnosis (Phase 7): when the app is built with a tool layer
 (``create_app(tool_layer=...)``), the reasoning loop runs inside
@@ -144,6 +160,7 @@ grant. See ``docs/hosted-demo.md``.
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 from datetime import UTC, datetime
@@ -188,6 +205,8 @@ log = get_logger(__name__)
 
 ENV_API_TOKEN = "SRE_AGENT_API_TOKEN"
 TOKEN_HEADER = "X-SRE-Agent-Token"
+ENV_APPROVER_TOKENS = "SRE_AGENT_APPROVER_TOKENS"
+APPROVER_TOKEN_HEADER = "X-SRE-Agent-Approver-Token"
 
 
 def _result_view(result: IngestResult) -> dict[str, object]:
@@ -240,9 +259,14 @@ class ProposeActionRequest(BaseModel):
 
 
 class ApprovalDecisionRequest(BaseModel):
-    """One named human's decision on one pending action."""
+    """A decision on one pending action, as the API accepts it.
 
-    by: str = Field(max_length=200)
+    There is deliberately no name field: who decided is taken from
+    the approver credential presented with the call (see
+    ``APPROVER_TOKEN_HEADER``), never from anything the request
+    claims. A body sent by an older client, name included, is
+    accepted and its claimed name ignored.
+    """
 
 
 def _pending_view(
@@ -273,6 +297,7 @@ def _pending_view(
 def create_app(
     store: IncidentStore | None = None,
     auth_token: str | None = None,
+    approver_tokens: dict[str, str] | None = None,
     tool_layer: ToolLayer | None = None,
     approval_policy: EnvironmentPolicy | None = None,
     runbook_backend: DemoWorkloadBackend | None = None,
@@ -287,6 +312,15 @@ def create_app(
     ``auth_token`` wins when given; otherwise the token is read from
     the ``SRE_AGENT_API_TOKEN`` environment variable. An empty value
     counts as no token.
+
+    ``approver_tokens`` maps each approver's own credential to the
+    name recorded for them in the audit log; it wins when given,
+    otherwise the map is read from the ``SRE_AGENT_APPROVER_TOKENS``
+    environment variable as a JSON object. The approve and reject
+    endpoints require one of these credentials, separate from the
+    API token, and record the name bound to it. With no approver
+    credentials configured, those endpoints refuse and approvals
+    are disabled.
 
     ``tool_layer`` turns on server-side diagnosis: with one given,
     the reasoning loop diagnoses each new incident as its alert is
@@ -381,6 +415,32 @@ def create_app(
         token = os.environ.get(ENV_API_TOKEN) or None
     if token == "":
         token = None
+    approvers: dict[str, str] = dict(approver_tokens) if approver_tokens else {}
+    if not approvers:
+        raw_approvers = os.environ.get(ENV_APPROVER_TOKENS)
+        if raw_approvers:
+            try:
+                parsed = json.loads(raw_approvers)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"{ENV_APPROVER_TOKENS} must be a JSON object mapping "
+                    "approver tokens to approver names"
+                ) from exc
+            if not isinstance(parsed, dict) or not all(
+                isinstance(k, str) and isinstance(v, str)
+                for k, v in parsed.items()
+            ):
+                raise ValueError(
+                    f"{ENV_APPROVER_TOKENS} must be a JSON object mapping "
+                    "approver tokens to approver names"
+                )
+            approvers = parsed
+    for approver_token, approver_name in approvers.items():
+        if not approver_token or not approver_name.strip():
+            raise ValueError(
+                "approver tokens must map a non-empty token to a "
+                "non-empty approver name"
+            )
     app = FastAPI(title="sre-agent")
 
     def require_token(
@@ -461,6 +521,32 @@ def create_app(
                 detail="live approvals are not configured on this server",
             )
         return approval_policy, executor
+
+    def _authenticated_approver(presented: str | None) -> str:
+        """The name bound to the approver credential on this call.
+
+        The approve and reject endpoints are decided by this name
+        and no other: the API token cannot approve, a name claimed
+        in a request body is ignored, and with no approver
+        credentials configured there is no one who may approve, so
+        the endpoints refuse.
+        """
+        if not approvers:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "approvals are disabled on this server: no approver "
+                    "credentials are configured (pass approver_tokens "
+                    f"or set {ENV_APPROVER_TOKENS})"
+                ),
+            )
+        if presented is not None:
+            for approver_token, approver_name in approvers.items():
+                if secrets.compare_digest(presented, approver_token):
+                    return approver_name
+        raise HTTPException(
+            status_code=401, detail="missing or wrong approver token"
+        )
 
     def _pending_or_404(incident_id: str, pending_id: str) -> PendingAction:
         pending = pendings.get(pending_id)
@@ -565,7 +651,12 @@ def create_app(
         dependencies=guarded,
     )
     def approve_action(
-        incident_id: str, pending_id: str, body: ApprovalDecisionRequest
+        incident_id: str,
+        pending_id: str,
+        body: ApprovalDecisionRequest | None = None,
+        x_sre_agent_approver_token: str | None = Header(
+            default=None, alias=APPROVER_TOKEN_HEADER
+        ),
     ) -> dict[str, object]:
         incident = _incident_or_404(incident_id)
         policy, executor = _approvals_or_409()
@@ -577,6 +668,7 @@ def create_app(
                     "only the Tier 3 demo grant can run an action"
                 ),
             )
+        approver = _authenticated_approver(x_sre_agent_approver_token)
         pending = _pending_or_404(incident_id, pending_id)
         if pending.id in decisions:
             raise HTTPException(
@@ -587,7 +679,7 @@ def create_app(
         try:
             grant, allowed = approve_pending(
                 pending,
-                approved_by=body.by,
+                approved_by=approver,
                 policy=policy,
                 audit_log=audit,
                 incident_target=incident.target,
@@ -625,7 +717,12 @@ def create_app(
         dependencies=guarded,
     )
     def reject_action(
-        incident_id: str, pending_id: str, body: ApprovalDecisionRequest
+        incident_id: str,
+        pending_id: str,
+        body: ApprovalDecisionRequest | None = None,
+        x_sre_agent_approver_token: str | None = Header(
+            default=None, alias=APPROVER_TOKEN_HEADER
+        ),
     ) -> dict[str, object]:
         incident = _incident_or_404(incident_id)
         _approvals_or_409()
@@ -637,12 +734,8 @@ def create_app(
                     "only the Tier 3 demo grant can run an action"
                 ),
             )
+        approver = _authenticated_approver(x_sre_agent_approver_token)
         pending = _pending_or_404(incident_id, pending_id)
-        if not body.by.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="a rejection must name who is rejecting",
-            )
         if pending.id in decisions:
             raise HTTPException(
                 status_code=409,
@@ -653,7 +746,7 @@ def create_app(
         return {
             "pending_id": pending.id,
             "decision": "rejected",
-            "rejected_by": body.by.strip(),
+            "rejected_by": approver,
             "runbook_id": pending.action.runbook_id,
             "summary": None,
             "incident_status": incident.status.value,
@@ -667,7 +760,9 @@ def create_app(
 # with the seeded demo read adapters selected as extra evidence
 # sources and the seeded demo memory attached as advice, and serves
 # live approvals against the seeded demo workloads, under a Tier 2
-# policy for the demo environment. It passes no diagnosis backend,
+# policy for the demo environment. Its approve and reject endpoints
+# stay disabled until the operator configures approver credentials
+# (SRE_AGENT_APPROVER_TOKENS). It passes no diagnosis backend,
 # so its diagnoses come from the deterministic backend — the
 # language-model backend is off in the shipped server.
 _demo_backend = demo_runbooks()[1]

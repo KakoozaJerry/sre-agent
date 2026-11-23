@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from sre_agent.ingestion import IncidentStore
-from sre_agent.server import TOKEN_HEADER, create_app
+from sre_agent.server import APPROVER_TOKEN_HEADER, TOKEN_HEADER, create_app
 from sre_agent.tools import demo_tool_layer
 
 
@@ -284,6 +284,11 @@ def test_a_server_without_a_tool_layer_records_only(client: TestClient):
 
 # --- Phase 7: live approvals are served by the server ---
 
+# The approver credential the approvals fixture configures, bound
+# to the name "Abraham": approving over HTTP takes this header,
+# never a name claimed in the request body (finding S2).
+APPROVER_HEADERS = {APPROVER_TOKEN_HEADER: "approver-token"}
+
 
 @pytest.fixture()
 def approvals_setup():
@@ -301,6 +306,7 @@ def approvals_setup():
     client = TestClient(
         create_app(
             IncidentStore(),
+            approver_tokens={"approver-token": "Abraham"},
             tool_layer=demo_tool_layer(),
             approval_policy=policy,
             runbook_backend=backend,
@@ -350,7 +356,7 @@ def test_an_approved_action_runs_once_on_the_server(approvals_setup):
     pending = _propose(client, incident_id).json()["pending"]
     approved = client.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert approved.status_code == 200
     body = approved.json()
@@ -371,7 +377,7 @@ def test_an_approved_action_runs_once_on_the_server(approvals_setup):
     # Single-use: the same approval cannot be decided a second time.
     again = client.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert again.status_code == 409
     state = backend.get(Target(environment="demo", namespace="shop", service="checkout"))
@@ -388,13 +394,13 @@ def test_a_rejected_action_runs_nothing_and_cannot_be_approved(approvals_setup):
     pending = _propose(client, incident_id).json()["pending"]
     rejected = client.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/reject",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert rejected.status_code == 200
     assert rejected.json()["decision"] == "rejected"
     late = client.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert late.status_code == 409
     state = backend.get(Target(environment="demo", namespace="shop", service="checkout"))
@@ -422,7 +428,7 @@ def test_policy_is_rechecked_when_the_server_approval_is_given(approvals_setup):
     policy.halted = True
     refused = client.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert refused.status_code == 403
     assert "policy now denies" in refused.json()["detail"]
@@ -448,7 +454,7 @@ def test_an_expired_approval_cannot_be_used_on_the_server(
     monkeypatch.setattr("sre_agent.approvals._utcnow", lambda: future)
     refused = client.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert refused.status_code == 409
     assert "expired" in refused.json()["detail"]
@@ -481,12 +487,159 @@ def test_a_scale_approval_runs_with_its_parameters(approvals_setup):
     assert pending["parameters"] == {"replicas": 4}
     approved = client.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert approved.status_code == 200
     assert "Scaled checkout from 2 to 4 replicas" in approved.json()["summary"]
     state = backend.get(Target(environment="demo", namespace="shop", service="checkout"))
     assert state is not None and state.replicas == 4
+
+
+# --- approving takes the approver's own credential (finding S2) ---
+
+
+def _both_credentials_client(backend, audit):
+    from sre_agent.policy import EnvironmentPolicy, Tier
+
+    policy = EnvironmentPolicy(
+        environment="demo",
+        granted_tier=Tier.ACT_WITH_APPROVAL,
+        max_replicas_affected=5,
+    )
+    return TestClient(
+        create_app(
+            IncidentStore(),
+            auth_token="api-token",
+            approver_tokens={"approver-token": "Abraham"},
+            tool_layer=demo_tool_layer(),
+            approval_policy=policy,
+            runbook_backend=backend,
+            audit_log=audit,
+        )
+    )
+
+
+def test_the_api_token_cannot_approve_and_a_claimed_name_is_never_recorded():
+    from sre_agent.audit import AuditLog
+    from sre_agent.models import Target
+    from sre_agent.runbooks import demo_runbooks
+
+    _, backend = demo_runbooks()
+    audit = AuditLog()
+    client = _both_credentials_client(backend, audit)
+    api_headers = {TOKEN_HEADER: "api-token"}
+    body = client.post(
+        "/webhooks/generic", json=GENERIC_ALERT, headers=api_headers
+    ).json()
+    incident_id = body["incident_id"]
+    pending = client.post(
+        f"/incidents/{incident_id}/actions",
+        json={"runbook_id": "restart-workload"},
+        headers=api_headers,
+    ).json()["pending"]
+    url = f"/incidents/{incident_id}/approvals/{pending['id']}/approve"
+    # No approver credential at all.
+    assert client.post(url, headers=api_headers).status_code == 401
+    # The API token presented as the approver credential, with a
+    # claimed name in the body: still not an approval.
+    forged = client.post(
+        url,
+        json={"by": "incident-commander"},
+        headers={**api_headers, APPROVER_TOKEN_HEADER: "api-token"},
+    )
+    assert forged.status_code == 401
+    # A wrong approver credential.
+    wrong = client.post(
+        url, headers={**api_headers, APPROVER_TOKEN_HEADER: "nope"}
+    )
+    assert wrong.status_code == 401
+    state = backend.get(
+        Target(environment="demo", namespace="shop", service="checkout")
+    )
+    assert state is not None and state.restarts == 0 and state.failing
+    # The real approver credential approves. Even with a claimed
+    # name in the body, the recorded approver is the name bound to
+    # the credential — in the reply and in the audit log alike.
+    approved = client.post(
+        url,
+        json={"by": "incident-commander"},
+        headers={**api_headers, APPROVER_TOKEN_HEADER: "approver-token"},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["approved_by"] == "Abraham"
+    assert audit.for_incident(incident_id)[-1].approved_by == "Abraham"
+    state = backend.get(
+        Target(environment="demo", namespace="shop", service="checkout")
+    )
+    assert state is not None and state.restarts == 1
+
+
+def test_approvals_refuse_when_no_approver_credentials_are_configured():
+    from sre_agent.models import Target
+    from sre_agent.policy import EnvironmentPolicy, Tier
+    from sre_agent.runbooks import demo_runbooks
+
+    _, backend = demo_runbooks()
+    policy = EnvironmentPolicy(
+        environment="demo",
+        granted_tier=Tier.ACT_WITH_APPROVAL,
+        max_replicas_affected=5,
+    )
+    client = TestClient(
+        create_app(
+            IncidentStore(),
+            tool_layer=demo_tool_layer(),
+            approval_policy=policy,
+            runbook_backend=backend,
+        )
+    )
+    incident_id = _diagnosed_incident(client)
+    pending = _propose(client, incident_id).json()["pending"]
+    for verb in ("approve", "reject"):
+        refused = client.post(
+            f"/incidents/{incident_id}/approvals/{pending['id']}/{verb}",
+            headers={APPROVER_TOKEN_HEADER: "anything"},
+        )
+        assert refused.status_code == 403
+        assert "no approver credentials" in refused.json()["detail"]
+    state = backend.get(
+        Target(environment="demo", namespace="shop", service="checkout")
+    )
+    assert state is not None and state.restarts == 0 and state.failing
+
+
+def test_approver_tokens_can_come_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from sre_agent.audit import AuditLog
+    from sre_agent.policy import EnvironmentPolicy, Tier
+    from sre_agent.runbooks import demo_runbooks
+    from sre_agent.server import ENV_APPROVER_TOKENS
+
+    monkeypatch.setenv(ENV_APPROVER_TOKENS, '{"env-token": "Abraham"}')
+    _, backend = demo_runbooks()
+    policy = EnvironmentPolicy(
+        environment="demo",
+        granted_tier=Tier.ACT_WITH_APPROVAL,
+        max_replicas_affected=5,
+    )
+    client = TestClient(
+        create_app(
+            IncidentStore(),
+            tool_layer=demo_tool_layer(),
+            approval_policy=policy,
+            runbook_backend=backend,
+            audit_log=AuditLog(),
+        )
+    )
+    incident_id = _diagnosed_incident(client)
+    pending = _propose(client, incident_id).json()["pending"]
+    approved = client.post(
+        f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
+        headers={APPROVER_TOKEN_HEADER: "env-token"},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["approved_by"] == "Abraham"
 
 
 def test_approvals_need_a_diagnosed_incident_and_a_known_incident(approvals_setup):

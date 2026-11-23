@@ -43,7 +43,7 @@ from sre_agent.policy import EnvironmentPolicy, Tier
 from sre_agent.regression import check_regression, load_baseline
 from sre_agent.runbooks import demo_runbooks
 from sre_agent.security_review import run_security_review
-from sre_agent.server import create_app
+from sre_agent.server import APPROVER_TOKEN_HEADER, create_app
 from sre_agent.storage import SQLiteIncidentStore
 from sre_agent.tier3 import run_tier3_drills
 from sre_agent.tools import demo_tool_layer
@@ -61,11 +61,15 @@ GENERIC_ALERT = {
 }
 
 
+APPROVER_HEADERS = {APPROVER_TOKEN_HEADER: "approver-token"}
+
+
 def _fully_wired_client(store: SQLiteIncidentStore, backend) -> TestClient:
     """One server with every Phase 7 piece switched on at once."""
     return TestClient(
         create_app(
             store,
+            approver_tokens={"approver-token": "Abraham"},
             tool_layer=demo_tool_layer(),
             adapters=demo_adapter_sources(),
             memory=demo_incident_memory(),
@@ -166,13 +170,13 @@ def test_fully_wired_gate_survives_a_restart_and_runs_once(
     assert found["memory_report"] is not None
     approved = client2.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert approved.status_code == 200
     assert approved.json()["incident_status"] == "mitigating"
     again = client2.post(
         f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
-        json={"by": "Abraham"},
+        headers=APPROVER_HEADERS,
     )
     assert again.status_code == 409
     state = backend.get(

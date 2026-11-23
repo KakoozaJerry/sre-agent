@@ -135,6 +135,12 @@ def approve_pending(
 ) -> tuple[ApprovalGrant, PolicyResult]:
     """Approve one pending action and return its grant and ALLOW decision.
 
+    ``approved_by`` is written to the audit log as the human who
+    approved, so it must be an identity the caller has actually
+    authenticated — the server takes it from the approver's own
+    credential, the CLI from the operator at the terminal — never
+    a name a request merely claimed.
+
     The policy engine decides again here, at approval time: a
     decision of DENY is recorded in the audit log and the approval
     fails; a decision of ALLOW means the action no longer needs a

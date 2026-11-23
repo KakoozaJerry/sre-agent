@@ -194,10 +194,14 @@ if you installed by hand and your `.venv` is active, the plain
 names (`sre-agent`, `uvicorn`) do the same thing.
 
 **1. Start the server.** Leave this terminal open; the
-server runs in it.
+server runs in it. The start command first sets one approver
+credential, bound to your name: approving a fix takes that
+credential — never a name typed into a request — so put your
+own token value in place of `pick-a-token`:
 
 ```bash
-.venv/bin/uvicorn sre_agent.server:app --port 8080
+SRE_AGENT_APPROVER_TOKENS='{"pick-a-token":"your name"}' \
+  .venv/bin/uvicorn sre_agent.server:app --port 8080
 ```
 
 In a second terminal, in the same folder, check it is up:
@@ -251,16 +255,17 @@ curl -X POST http://localhost:8080/incidents/<incident-id>/actions \
 The reply is `201` with `"decision": "require_approval"` and
 a `"pending"` block: copy its `"id"` as `<pending-id>`. It
 touches 2 replicas and expires in 15 minutes. See what is
-waiting, then approve it under your own name:
+waiting, then approve it with the approver credential you set
+when you started the server — the name recorded in the audit
+log is the one bound to that credential:
 
 ```bash
 curl http://localhost:8080/incidents/<incident-id>/approvals
 curl -X POST http://localhost:8080/incidents/<incident-id>/approvals/<pending-id>/approve \
-  -H 'Content-Type: application/json' \
-  -d '{"by":"your name"}'
+  -H 'X-SRE-Agent-Approver-Token: pick-a-token'
 ```
 
-(To turn it down instead, send the same name to the same
+(To turn it down instead, send the same credential to the same
 address ending in `/reject`; nothing then runs.) A successful
 approval answers with the summary "Restarted checkout:
 restarts now 1, failing state cleared." and
