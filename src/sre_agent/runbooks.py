@@ -22,6 +22,14 @@ How safety is kept, in plain words:
   so the policy engine's blast-radius check sees a true number), and
   again inside the executor, so a hand-made proposal cannot skip the
   checks.
+- **The blast radius is recounted at the door.** The executor works
+  out again, from the workload's state as it stands when the action
+  is about to run, how many replicas the action would touch, and
+  refuses if that number differs from the one the policy engine
+  checked and a human approved. A workload that changed in between
+  — scaled up after the approval, say — makes the earlier check
+  stale, and nothing runs: the action must be proposed again so it
+  is checked against the workload as it stands now.
 - **The executor runs nothing without an ALLOW decision.** A denied
   action is refused, and so is an action that still needs a human's
   approval: turning "a human said yes" into a runnable decision is
@@ -129,6 +137,27 @@ def validate_parameters(
     return dict(parameters)
 
 
+def _count_replicas_affected(
+    runbook_id: str,
+    parameters: dict[str, str | int | float | bool],
+    state: WorkloadState,
+) -> int:
+    """How many replicas one action touches, from the workload's
+    state as it stands now.
+
+    A restart or a rollback touches every copy that is running; a
+    scale touches the difference between the copies running now and
+    the copies asked for. ``build_action`` states this number on a
+    proposal and the executor counts it again at the door, so the
+    two can never quietly disagree about the rule.
+    """
+    if runbook_id == "scale-replicas":
+        wanted = parameters["replicas"]
+        assert isinstance(wanted, int)  # validated before this is called
+        return abs(wanted - state.replicas)
+    return state.replicas
+
+
 def build_action(
     runbook_id: str,
     target: Target,
@@ -153,12 +182,7 @@ def build_action(
             f"no demo workload named {target.service} in "
             f"{target.namespace} ({target.environment})"
         )
-    if runbook_id == "scale-replicas":
-        wanted = checked["replicas"]
-        assert isinstance(wanted, int)  # validated above
-        affected = abs(wanted - state.replicas)
-    else:
-        affected = state.replicas
+    affected = _count_replicas_affected(runbook_id, checked, state)
     return ProposedAction(
         runbook_id=runbook_id,
         target=target,
@@ -211,7 +235,12 @@ class RunbookExecutor:
         Any other decision — denied, or still waiting for a human's
         approval — is refused here and nothing changes. Parameters
         are validated again at this door, so no proposal reaches a
-        workload unchecked, however it was built.
+        workload unchecked, however it was built. The blast radius
+        is also recounted at this door, from the workload's state as
+        it stands now: if the action would touch a different number
+        of replicas than the one the policy engine checked and a
+        human approved, the workload has changed since that check
+        and nothing runs.
         """
         if decision.decision is not Decision.ALLOW:
             raise RunbookError(
@@ -224,6 +253,19 @@ class RunbookExecutor:
             raise RunbookError(
                 f"no demo workload named {action.target.service} in "
                 f"{action.target.namespace} ({action.target.environment})"
+            )
+        actual = _count_replicas_affected(
+            action.runbook_id, action.parameters, state
+        )
+        if actual != action.replicas_affected:
+            raise RunbookError(
+                f"this action was checked as touching "
+                f"{action.replicas_affected} replica(s), but "
+                f"{action.target.service} as it stands now would have "
+                f"it touch {actual}; the workload changed after the "
+                "action was checked and approved, so nothing was run "
+                "— propose the action again so it is checked against "
+                "the workload as it stands now"
             )
         before = _snapshot(state)
         if action.runbook_id == "restart-workload":

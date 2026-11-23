@@ -50,8 +50,21 @@ GENESIS_HASH = "0" * 64
 
 
 def parameters_hash(action: ProposedAction) -> str:
-    """A fingerprint of an action's parameters, safe to store and show."""
-    canonical = json.dumps(action.parameters, sort_keys=True, separators=(",", ":"))
+    """A fingerprint of an action, safe to store and show.
+
+    The fingerprint covers the parameters and the blast-radius
+    count together, so an approval granted for an action touching
+    two replicas can never be matched to the same action restated
+    as touching a different number.
+    """
+    canonical = json.dumps(
+        {
+            "parameters": action.parameters,
+            "replicas_affected": action.replicas_affected,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 

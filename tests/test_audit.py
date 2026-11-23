@@ -81,6 +81,15 @@ def test_parameters_hash_changes_with_the_parameters():
     assert parameters_hash(_action()) != parameters_hash(
         _action(parameters={"deployment": "other"})
     )
+
+
+def test_parameters_hash_changes_with_the_blast_radius_count():
+    # The fingerprint binds the count too: an approval granted for
+    # an action touching one replica matches no restatement of that
+    # action touching more.
+    assert parameters_hash(_action()) != parameters_hash(
+        _action(replicas_affected=3)
+    )
     # key order does not change the fingerprint
     a = _action(parameters={"a": 1, "b": 2})
     b = _action(parameters={"b": 2, "a": 1})

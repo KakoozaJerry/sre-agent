@@ -28,7 +28,15 @@ from sre_agent.policy import (
     PolicyResult,
     Tier,
 )
-from sre_agent.runbooks import RunbookError, build_action, demo_runbooks
+from sre_agent.runbooks import (
+    DemoWorkloadBackend,
+    RunbookError,
+    RunbookExecutor,
+    WorkloadState,
+    build_action,
+    demo_runbooks,
+)
+from sre_agent.tier3 import demo_tier3_policy
 
 CHECKOUT = Target(environment="demo", namespace="shop", service="checkout")
 SEARCH = Target(environment="demo", namespace="shop", service="search")
@@ -233,3 +241,59 @@ def test_cli_approve_demo_unknown_runbook_is_a_plain_error(capsys) -> None:
     assert main(["approve-demo", "--by", "Abraham", "--runbook", "nuke-it",
                  "--yes"]) == 1
     assert "not in the runbook library" in capsys.readouterr().err
+
+
+# --- the blast radius cannot grow between approval and run ---
+
+
+def test_an_approval_cannot_outgrow_the_blast_radius_limit() -> None:
+    """The S1 scenario, end to end: a rollback is proposed and
+    approved while checkout runs 2 replicas, under a policy limit of
+    3. A Tier 3 scale then takes checkout to 5. The approval was
+    granted for a blast radius of 2, so the rollback must not run
+    against 5 — the executor recounts at the door and refuses."""
+    backend = DemoWorkloadBackend(
+        [
+            WorkloadState(
+                target=CHECKOUT, replicas=2, version="v2",
+                previous_versions=["v1"], failing=True,
+            )
+        ]
+    )
+    executor = RunbookExecutor(backend)
+    policy = demo_tier3_policy()
+    assert policy.max_replicas_affected == 3
+    log = AuditLog()
+
+    rollback = build_action(
+        "rollback-deployment", CHECKOUT, {}, backend, rationale="bad deploy"
+    )
+    assert rollback.replicas_affected == 2
+    result = evaluate_and_audit(
+        rollback, policy, log, incident_id="inc-1", incident_target=CHECKOUT
+    )
+    assert result.decision is Decision.REQUIRE_APPROVAL
+    pending = create_pending(rollback, result, incident_id="inc-1", now=NOW)
+
+    scale = build_action(
+        "scale-replicas", CHECKOUT, {"replicas": 5}, backend,
+        rationale="more capacity",
+    )
+    scale_result = evaluate_and_audit(
+        scale, policy, log, incident_id="inc-1", incident_target=CHECKOUT
+    )
+    assert scale_result.decision is Decision.ALLOW
+    executor.execute(scale, scale_result)
+    state = backend.get(CHECKOUT)
+    assert state is not None and state.replicas == 5
+
+    grant, allowed = approve_pending(
+        pending, approved_by="Abraham", policy=policy, audit_log=log,
+        incident_target=CHECKOUT, now=NOW,
+    )
+    with pytest.raises(RunbookError, match="checked as touching 2 replica"):
+        execute_approved(executor, pending, grant, allowed, now=NOW)
+    # The grant is spent by the attempt, and the workload is untouched.
+    assert grant.used
+    state = backend.get(CHECKOUT)
+    assert state is not None and state.version == "v2" and state.replicas == 5

@@ -38,11 +38,20 @@ ALLOW = PolicyResult(decision=Decision.ALLOW, reason="test grant")
 
 
 def _action(runbook_id: str, parameters: dict | None = None) -> ProposedAction:
+    # The count build_action would state for the seeded checkout
+    # workload (2 replicas): a restart or a rollback touches both
+    # copies; a scale touches the difference. The executor recounts
+    # at the door, so a hand-made action must state the true number.
+    parameters = parameters or {}
+    if runbook_id == "scale-replicas":
+        affected = abs(parameters.get("replicas", 2) - 2)
+    else:
+        affected = 2
     return ProposedAction(
         runbook_id=runbook_id,
         target=CHECKOUT,
-        parameters=parameters or {},
-        replicas_affected=0,
+        parameters=parameters,
+        replicas_affected=affected,
         rationale="test",
     )
 
@@ -139,6 +148,57 @@ def test_executor_revalidates_parameters_and_runbook() -> None:
         executor.execute(_action("scale-replicas", {"replicas": 99}), ALLOW)
     with pytest.raises(RunbookError, match="not in the runbook library"):
         executor.execute(_action("nuke-it"), ALLOW)
+
+
+def test_executor_recounts_the_blast_radius_at_the_door() -> None:
+    """The workload grows after the proposal was built and checked:
+    the executor counts again and runs nothing."""
+    executor, backend = demo_runbooks()
+    action = build_action(
+        "restart-workload", CHECKOUT, {}, backend, rationale="checkout is failing"
+    )
+    assert action.replicas_affected == 2
+    state = backend.get(CHECKOUT)
+    assert state is not None
+    state.replicas = 4
+    backend.save(state)
+    with pytest.raises(RunbookError, match="checked as touching 2 replica"):
+        executor.execute(action, ALLOW)
+    state = backend.get(CHECKOUT)
+    assert state is not None and state.restarts == 0 and state.failing
+
+
+def test_executor_refuses_a_hand_made_action_that_understates_its_blast_radius() -> None:
+    """A proposer who states a smaller count than the truth — the
+    number the policy engine never checked — gets no run."""
+    executor, backend = demo_runbooks()
+    action = ProposedAction(
+        runbook_id="restart-workload",
+        target=CHECKOUT,
+        parameters={},
+        replicas_affected=0,
+        rationale="test",
+    )
+    with pytest.raises(RunbookError, match="would have it touch 2"):
+        executor.execute(action, ALLOW)
+    state = backend.get(CHECKOUT)
+    assert state is not None and state.restarts == 0 and state.failing
+
+
+def test_executor_recounts_a_scale_against_the_current_size() -> None:
+    executor, backend = demo_runbooks()
+    action = build_action(
+        "scale-replicas", CHECKOUT, {"replicas": 3}, backend, rationale="test"
+    )
+    assert action.replicas_affected == 1
+    state = backend.get(CHECKOUT)
+    assert state is not None
+    state.replicas = 5
+    backend.save(state)
+    with pytest.raises(RunbookError, match="nothing was run"):
+        executor.execute(action, ALLOW)
+    state = backend.get(CHECKOUT)
+    assert state is not None and state.replicas == 5
 
 
 # --- the three fixes, on demo targets ---
