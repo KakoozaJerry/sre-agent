@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Self
 
@@ -107,6 +108,13 @@ class SQLiteIncidentStore(IncidentStore):
     the file's state at start-up and re-writes it after every
     change (ingestion, a ``save`` from the server, an approval
     being created or decided).
+
+    The server drives the store from a threadpool, so every
+    write path is serialised through one re-entrant lock, held
+    across the in-memory change and the write-through that
+    follows it: a change and its persistence are one step, and
+    the file can never be written from a half-updated memory
+    while another thread's change lands in between.
     """
 
     def __init__(
@@ -122,6 +130,7 @@ class SQLiteIncidentStore(IncidentStore):
         self._path = Path(path)
         if self._path.parent != Path(""):
             self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
@@ -217,20 +226,22 @@ class SQLiteIncidentStore(IncidentStore):
     # -- the store interface, with write-through -------------------
 
     def ingest(self, alert: IncomingAlert) -> IngestResult:
-        result = super().ingest(alert)
-        self._sync()
-        return result
+        with self._lock:
+            result = super().ingest(alert)
+            self._sync()
+            return result
 
     def save(self, incident: Incident) -> None:
-        super().save(incident)
-        self._sync()
+        with self._lock:
+            super().save(incident)
+            self._sync()
 
     # -- approvals ---------------------------------------------------
 
     def save_approval(
         self, pending: PendingAction, decision: str | None
     ) -> None:
-        with self._conn:
+        with self._lock, self._conn:
             self._conn.execute(
                 "INSERT INTO approvals (pending_id, incident_id, data, decision) "
                 "VALUES (?, ?, ?, ?) "

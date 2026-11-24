@@ -12,6 +12,8 @@ original expiry — while a decided one stays decided.
 
 from __future__ import annotations
 
+import sqlite3
+import threading
 from pathlib import Path
 
 import pytest
@@ -254,6 +256,94 @@ def test_a_pending_approval_survives_a_restart_and_runs_once(
     )
     assert state is not None and state.restarts == 1
     third_store.close()
+
+
+# --- concurrency: the store under the server's threadpool (B2) ---
+
+
+def test_concurrent_ingests_all_survive_a_reload(tmp_path: Path):
+    # The server drives one store from its threadpool. Before the
+    # store serialised its writes, this shape of load raised sqlite
+    # errors on most ingests — after the in-memory change had
+    # already landed — and the file came back missing records the
+    # memory held. Six threads, one service each, sixty grouped
+    # alerts apiece: no errors, and a reload must return exactly
+    # what memory holds.
+    path = tmp_path / "concurrent.db"
+    store = SQLiteIncidentStore(path)
+    errors: list[Exception] = []
+
+    def worker(thread_no: int) -> None:
+        for seq in range(60):
+            try:
+                store.ingest(
+                    normalize_generic(
+                        _generic(
+                            service=f"svc-{thread_no}",
+                            fingerprint=f"fp-{thread_no}-{seq}",
+                        )
+                    )
+                )
+            except (RuntimeError, sqlite3.Error) as exc:
+                # The two failure families the unlocked store
+                # produced; collected here and asserted below.
+                errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    in_memory = store.list_incidents()
+    assert len(in_memory) == 6
+    assert sum(len(inc.evidence) for inc in in_memory) == 360
+    store.close()
+
+    reopened = SQLiteIncidentStore(path)
+    reloaded = reopened.list_incidents()
+    assert {inc.id for inc in reloaded} == {inc.id for inc in in_memory}
+    assert sum(len(inc.evidence) for inc in reloaded) == 360
+    reopened.close()
+
+
+def test_a_failed_sync_leaves_the_file_whole_and_memory_reconverges(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # If the write-through fails, the caller hears about it, the
+    # file still holds the last whole state (never half an update),
+    # and the next successful write re-converges file and memory,
+    # because every write replaces the tables from memory in full.
+    path = tmp_path / "failed-sync.db"
+    store = SQLiteIncidentStore(path)
+    first = store.ingest(normalize_generic(_generic()))
+    assert first.incident is not None
+
+    def boom() -> None:
+        raise RuntimeError("simulated write failure")
+
+    monkeypatch.setattr(store, "_sync", boom)
+    with pytest.raises(RuntimeError, match="simulated write failure"):
+        store.ingest(
+            normalize_generic(_generic(service="payments", fingerprint="zzz999"))
+        )
+    monkeypatch.undo()
+
+    on_disk = SQLiteIncidentStore(path)
+    assert [inc.id for inc in on_disk.list_incidents()] == [first.incident.id]
+    on_disk.close()
+
+    store.ingest(
+        normalize_generic(_generic(service="search", fingerprint="yyy888"))
+    )
+    store.close()
+    reopened = SQLiteIncidentStore(path)
+    assert len(reopened.list_incidents()) == 3
+    assert {inc.id for inc in reopened.list_incidents()} == {
+        inc.id for inc in store.list_incidents()
+    }
+    reopened.close()
 
 
 def test_a_rejected_approval_stays_rejected_after_a_restart(tmp_path: Path):
