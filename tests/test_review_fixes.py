@@ -119,3 +119,62 @@ def test_deeply_nested_model_json_is_refused_not_raised(module):
         from sre_agent.model_proposals import _checked_reply
 
         assert _checked_reply(deep) is None
+
+
+# --- Second 2026-11-25 review pass -----------------------------------
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://api.example.com?api_key=secret",
+        "https://api.example.com/v1?x=1",
+        "https://api.example.com/#frag",
+    ],
+)
+def test_a_backend_url_with_a_query_or_fragment_is_refused(url):
+    with pytest.raises(ValueError) as caught:
+        validate_backend_url(url)
+    assert "secret" not in str(caught.value)
+
+
+def test_a_plain_backend_url_is_still_accepted():
+    assert validate_backend_url("https://api.example.com/v1/") == (
+        "https://api.example.com/v1"
+    )
+
+
+@pytest.mark.parametrize(
+    "service", ["checkout,tier!=web", "a b", "app=x", "-bad", "x" * 64, ""]
+)
+def test_kubernetes_service_must_be_a_label_value(service):
+    from sre_agent.adapters.kubernetes import ListPodsRequest
+
+    with pytest.raises(ValidationError):
+        ListPodsRequest(namespace="shop", service=service)
+
+
+def test_kubernetes_ordinary_service_names_pass():
+    from sre_agent.adapters.kubernetes import ListPodsRequest
+
+    for name in ("checkout", "check_out.v2", "a", "x" * 63):
+        assert ListPodsRequest(namespace="shop", service=name).service == name
+
+
+def test_live_demo_http_exception_is_not_taken_from_the_address():
+    from sre_agent.demo_live import live_demo_tool_layer
+
+    with pytest.raises(ValueError):
+        live_demo_tool_layer(prometheus_url="http://attacker.example:9090")
+    with pytest.raises(ValueError):
+        live_demo_tool_layer(sample_service_url="http://attacker.example:8000")
+    # The Compose names themselves are still allowed.
+    live_demo_tool_layer()
+
+
+def test_a_corrupt_audit_tail_is_logged_not_silent(tmp_path, caplog):
+    path = tmp_path / "audit.jsonl"
+    path.write_text("{not json\n", encoding="utf-8")
+    with caplog.at_level("WARNING"):
+        AuditLog(path)
+    assert any("genesis" in r.getMessage() for r in caplog.records)

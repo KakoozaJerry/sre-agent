@@ -139,6 +139,13 @@ def validate_backend_url(
         raise ValueError(
             f"{what} must be an http:// or https:// address with a host: {url!r}"
         )
+    if parsed.query or parsed.fragment or parsed.params:
+        # Backends append their own paths to this base address; a
+        # query string or fragment here would swallow those paths
+        # (and is where an api_key=... would otherwise end up in logs).
+        raise ValueError(
+            f"{what} must not carry a query string or fragment (host {host})"
+        )
     if parsed.username or parsed.password:
         raise ValueError(
             # The address itself is not echoed: it carries the very

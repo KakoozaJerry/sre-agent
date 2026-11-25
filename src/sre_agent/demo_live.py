@@ -40,10 +40,14 @@ Both are plain http to a host that is not this machine, which
 the backend address rules refuse by default (finding F-05).
 The Compose network is a private network on one operator's
 machine and neither service takes a credential, so the
-factory names each address's own host in the explicit
-``allow_http_hosts`` exception in ``backend_url.py`` — a
-separate, written-down decision for those two hosts only,
-never a widening of the general rule. Run it the way Compose
+factory names the two Compose hosts (``prometheus`` and
+``sample-service``) in the explicit ``allow_http_hosts``
+exception in ``backend_url.py`` — a separate, written-down
+decision for those two hosts only, never a widening of the
+general rule. The exception is fixed to those names, not taken
+from the configured address, so pointing an address variable at
+any other plain-http host is still refused (loopback is always
+allowed). Run it the way Compose
 does:
 
     uvicorn --factory sre_agent.demo_live:create_live_demo_app \
@@ -93,11 +97,11 @@ def live_demo_tool_layer(
     """Build the live tool layer: live Prometheus for metrics
     and status, the live sample service for log lines."""
     metrics = PrometheusMetricsBackend(
-        prometheus_url, allow_http_hosts=[_host_of(prometheus_url)]
+        prometheus_url, allow_http_hosts=[_host_of(DEFAULT_PROMETHEUS_URL)]
     )
     logs = SampleServiceLogsBackend(
         sample_service_url,
-        allow_http_hosts=[_host_of(sample_service_url)],
+        allow_http_hosts=[_host_of(DEFAULT_SAMPLE_SERVICE_URL)],
     )
     services = PrometheusServiceStatusBackend(metrics)
     return ToolLayer(metrics=metrics, logs=logs, services=services)

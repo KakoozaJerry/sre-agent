@@ -41,7 +41,7 @@ re-recorded its own baseline would prove nothing.
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -133,7 +133,7 @@ def baseline_from_report(
 ) -> Baseline:
     """Build a baseline record from one measured evaluation report."""
     ver = version if version is not None else __version__
-    day = recorded_on if recorded_on is not None else date.today().isoformat()
+    day = recorded_on if recorded_on is not None else datetime.now(UTC).date().isoformat()
     record = ReleaseRecord(
         version=ver,
         recorded_on=day,

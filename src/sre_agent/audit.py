@@ -41,8 +41,11 @@ import json
 import threading
 from pathlib import Path
 
+from .logging_config import get_logger
 from .models import AuditRecord, Target
 from .policy import EnvironmentPolicy, PolicyResult, ProposedAction, evaluate
+
+log = get_logger(__name__)
 
 # The ``prev_hash`` of the first record in every log: 64 zero
 # characters, so a real record hash (also 64 hex characters) can
@@ -169,7 +172,15 @@ class AuditLog:
             if not lines:
                 return GENESIS_HASH
             last = AuditRecord.model_validate_json(lines[-1])
-        except (OSError, ValueError):
+        except (OSError, ValueError) as exc:
+            # New records will start a fresh chain; verification will
+            # flag the break, but say so now rather than silently.
+            log.warning(
+                "audit log %s: last record unreadable (%s); "
+                "new records start from the genesis hash",
+                path,
+                type(exc).__name__,
+            )
             return GENESIS_HASH
         return last.record_hash or GENESIS_HASH
 
