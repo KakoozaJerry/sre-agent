@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -67,11 +68,19 @@ class SampleService:
         self.requests_total = 0
         self.errors_total = 0
         self.log_entries: list[dict[str, str]] = []
+        # ThreadingHTTPServer serves requests in parallel; counter
+        # increments and the bounded log are guarded so concurrent
+        # /work calls cannot lose updates.
+        self._lock = threading.RLock()
 
     def set_failing(self, failing: bool) -> None:
         self.failing = failing
 
     def _record_log(self, level: str, message: str) -> None:
+        with self._lock:
+            self._append_log(level, message)
+
+    def _append_log(self, level: str, message: str) -> None:
         self.log_entries.append(
             {
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -85,6 +94,10 @@ class SampleService:
         # the newest lines are kept.
         del self.log_entries[:-MAX_LOG_ENTRIES]
 
+    def log_snapshot(self) -> list[dict[str, str]]:
+        with self._lock:
+            return list(self.log_entries)
+
     def health(self) -> tuple[int, dict[str, str]]:
         if self.failing:
             return 503, {"status": "failing", "service": self.service}
@@ -92,6 +105,10 @@ class SampleService:
 
     def work(self) -> tuple[int, dict[str, str]]:
         """Do one pretend request. Failing requests are errors."""
+        with self._lock:
+            return self._work()
+
+    def _work(self) -> tuple[int, dict[str, str]]:
         self.requests_total += 1
         if self.failing:
             self.errors_total += 1
@@ -157,7 +174,7 @@ def make_handler(service: SampleService) -> type[BaseHTTPRequestHandler]:
                 self.end_headers()
                 self.wfile.write(data)
             elif self.path == "/logs":
-                self._send_json(200, {"entries": list(service.log_entries)})
+                self._send_json(200, {"entries": service.log_snapshot()})
             elif self.path == "/chaos":
                 self._send_json(200, {"failing": service.failing})
             else:

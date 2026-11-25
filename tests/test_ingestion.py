@@ -205,3 +205,20 @@ def test_grouped_alerts_stop_at_the_evidence_cap():
     store.ingest(normalize_generic(_generic()))
     with pytest.raises(IngestionLimitError):
         store.ingest(normalize_generic(_generic(fingerprint="def456")))
+
+
+def test_a_resolve_found_by_fingerprint_closes_the_incident_group_too():
+    """A resolve whose group key drifted must still close the group."""
+    store = IncidentStore()
+    opened = store.ingest(normalize_generic(_generic()))
+    closed = store.ingest(
+        normalize_generic(_generic(status="resolved", alert_name="HighErrorRenamed"))
+    )
+    assert opened.incident is not None and closed.resolved is True
+    # A new firing for the original group opens a fresh incident
+    # instead of being absorbed into the resolved one.
+    again = store.ingest(normalize_generic(_generic(fingerprint="new-fp")))
+    assert again.created is True
+    assert again.incident is not None
+    assert again.incident.id != opened.incident.id
+    assert again.incident.status is IncidentStatus.TRIAGING

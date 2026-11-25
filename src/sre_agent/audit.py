@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from pathlib import Path
 
 from .models import AuditRecord, Target
@@ -141,6 +142,10 @@ class AuditLog:
         self._path = Path(path) if path is not None else None
         self._records: list[AuditRecord] = []
         self._last_hash = self._chain_tail(self._path)
+        # Server endpoints record from threadpool threads; reading the
+        # chain tail, linking the new record and appending it must be
+        # one step, or two records can share a prev_hash.
+        self._lock = threading.Lock()
 
     @staticmethod
     def _chain_tail(path: Path | None) -> str:
@@ -182,6 +187,22 @@ class AuditLog:
         approved_by: str | None = None,
     ) -> AuditRecord:
         """Append one record for a policy decision and return it."""
+        with self._lock:
+            return self._append(
+                incident_id=incident_id,
+                action=action,
+                result=result,
+                approved_by=approved_by,
+            )
+
+    def _append(
+        self,
+        *,
+        incident_id: str,
+        action: ProposedAction,
+        result: PolicyResult,
+        approved_by: str | None,
+    ) -> AuditRecord:
         record = AuditRecord(
             incident_id=incident_id,
             action_summary=action_summary(action),

@@ -58,7 +58,9 @@ layer, for the day an operator's address is wrong.
 from __future__ import annotations
 
 import ipaddress
+import json
 import urllib.parse
+import urllib.request
 from collections.abc import Iterable
 
 _LOOPBACK_NAMES = {"localhost"}
@@ -139,7 +141,10 @@ def validate_backend_url(
         )
     if parsed.username or parsed.password:
         raise ValueError(
-            f"{what} must not carry a user or password in the address: {url!r}"
+            # The address itself is not echoed: it carries the very
+            # credential this rule exists to keep out of logs.
+            f"{what} must not carry a user or password in the address "
+            f"(host {host})"
         )
     if parsed.scheme == "http" and not _is_loopback(host):
         # The one explicit exception: a host the operator named
@@ -172,3 +177,55 @@ def validate_backend_url(
                 f"for this backend: {sorted(entries)}"
             )
     return cleaned
+
+
+# The most a backend reply may be before it is refused. Telemetry
+# replies the agent reads are small; a reply larger than this is a
+# misbehaving or hostile backend, and reading it whole would only
+# exhaust memory.
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    """Treat any redirect as an error instead of following it.
+
+    The address rules above are checked against the configured
+    base address only. Following a redirect would let a backend
+    send the agent — and the credential headers on its request —
+    to a host the rules never saw (plain http, or off the
+    allow-list), so a redirect is refused outright.
+    """
+
+    def redirect_request(  # type: ignore[override]
+        self,
+        req: urllib.request.Request,
+        fp: object,
+        code: int,
+        msg: str,
+        headers: object,
+        newurl: str,
+    ) -> None:
+        return None
+
+
+_OPENER = urllib.request.build_opener(_RefuseRedirects)
+
+
+def fetch_json(
+    request: str | urllib.request.Request,
+    *,
+    timeout: float,
+    max_bytes: int = MAX_RESPONSE_BYTES,
+) -> object:
+    """Fetch one backend address and parse its JSON reply.
+
+    Redirects are not followed (a 3xx raises ``HTTPError``) and a
+    reply larger than *max_bytes* raises ``ValueError``; both are
+    ordinary fetch failures to the callers, which already treat
+    any failed fetch as "this source is unavailable".
+    """
+    with _OPENER.open(request, timeout=timeout) as resp:
+        body = resp.read(max_bytes + 1)
+    if len(body) > max_bytes:
+        raise ValueError(f"backend reply exceeds {max_bytes} bytes; refused")
+    return json.loads(body.decode("utf-8"))

@@ -9,14 +9,13 @@ and the reader that turns a pod listing into evidence.
 
 from __future__ import annotations
 
-import json
 import re
 import urllib.parse
 import urllib.request
 
 from pydantic import BaseModel, Field, field_validator
 
-from ..backend_url import validate_backend_url
+from ..backend_url import fetch_json, validate_backend_url
 from ..logging_config import get_logger
 from ..models import Evidence
 from ..tools import MAX_EVIDENCE_SUMMARY_CHARS, redact_secrets
@@ -208,8 +207,7 @@ class KubernetesApiBackend:
         )
         if self._token:
             request.add_header("Authorization", f"Bearer {self._token}")
-        with urllib.request.urlopen(request, timeout=self._timeout) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+        payload = fetch_json(request, timeout=self._timeout)
         if not isinstance(payload, dict):
             return []
         return parse_kubernetes_pods(payload)

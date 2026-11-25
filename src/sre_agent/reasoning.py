@@ -375,7 +375,7 @@ class ReasoningLoop:
                     pods_result = None
                     pods_ev = None
             if adapters.datadog is not None:
-                if not _SAFE_NAME_RE.match(target.service):
+                if not _SAFE_NAME_RE.fullmatch(target.service):
                     log.warning(
                         "datadog adapter skipped for incident %s: the "
                         "service name is not a plain name",
@@ -403,7 +403,7 @@ class ReasoningLoop:
                         datadog_result = None
                         datadog_ev = None
             if adapters.azure is not None:
-                if not _SAFE_NAME_RE.match(target.service):
+                if not _SAFE_NAME_RE.fullmatch(target.service):
                     log.warning(
                         "azure adapter skipped for incident %s: the "
                         "service name is not a plain name",

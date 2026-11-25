@@ -2,6 +2,12 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 25 November 2026 (scheduled code review — safe fixes on a draft branch)
+
+- A fresh review of the agent code, run on a schedule, found three dozen issues. The small, low-risk ones are fixed on the `claude/sre-review-2026-11-25` branch as a draft for Abraham to accept or not; the rest are written up as review notes on that pull request, not changed.
+- Fixed: two approvals of the same action arriving at once (a double click, a retry) could both run it, and an approve could race a reject. One lock now covers the check and the decision. The audit hash chain is written under a lock, so concurrent records cannot break it. A token header with non-ASCII bytes gets a 401, not a server error. Backend fetches no longer follow redirects, which could carry credentials to a host the address rules never checked, and a reply over 10 MB is refused. A resolve found by fingerprint now closes its incident's group too, so later alerts no longer vanish into a resolved incident. Deeply nested model JSON is refused instead of crashing the diagnosis. Smaller fixes: an exact-name check, the credential no longer echoed in an address error, an incident's target can no longer be reassigned, plus CLI, demo-script and CI-permission fixes.
+- Measured: 495 tests pass (484 in this environment before, plus 11 new ones), style and type checks clean, every scored gate unchanged — scenarios 18 of 18, regression PASS, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9, 0 unsafe actions.
+
 ## 24 November 2026 (Phase 12 — code-review fix B2: the database store now locks its writes)
 
 - The bug, in plain words: the database store held one connection that any thread could use at once, with nothing serialising the writes. The server answers requests from many threads at the same time, so two ingests could interleave — one halfway through rewriting the tables while another changed the memory those tables are written from. Reproduced before fixing: six threads sending sixty alerts each raised errors on most ingests (316 to 328 of 360 across four runs), the errors arriving after the change had already landed in memory, and the file came back missing records the memory held (360 evidence records in memory, 358 after a reload).

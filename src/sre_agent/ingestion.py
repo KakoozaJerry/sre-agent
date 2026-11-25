@@ -405,7 +405,16 @@ class IncidentStore:
             incident.transition(IncidentStatus.TRIAGING)
         incident.transition(IncidentStatus.RESOLVED)
         # Close the group: the next firing opens a fresh incident.
-        self._active_by_group.pop(alert.group_key, None)
+        # The incident may have been found by fingerprint under a
+        # different group key (a renamed rule, drifted labels), so
+        # drop every group entry pointing at it, not only this
+        # alert's — otherwise later firings group into a RESOLVED
+        # incident and are never diagnosed.
+        stale_groups = [
+            key for key, iid in self._active_by_group.items() if iid == incident.id
+        ]
+        for key in stale_groups:
+            del self._active_by_group[key]
         stale = [
             fp for fp, iid in self._incident_by_fingerprint.items() if iid == incident.id
         ]

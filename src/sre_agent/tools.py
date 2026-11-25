@@ -53,7 +53,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator
 
-from .backend_url import validate_backend_url
+from .backend_url import fetch_json, validate_backend_url
 from .logging_config import get_logger
 from .models import Evidence, Target
 
@@ -383,8 +383,7 @@ class PrometheusMetricsBackend:
     def fetch(self, query: str) -> list[MetricSeries]:
         qs = urllib.parse.urlencode({"query": query})
         url = f"{self._base_url}/api/v1/query?{qs}"
-        with urllib.request.urlopen(url, timeout=self._timeout) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+        payload = fetch_json(url, timeout=self._timeout)
         if not isinstance(payload, dict):
             return []
         return parse_prometheus_response(payload)
@@ -697,8 +696,7 @@ class SampleServiceLogsBackend:
 
     def _fetch_entries(self) -> list[LogEntry]:
         url = f"{self._base_url}/logs"
-        with urllib.request.urlopen(url, timeout=self._timeout) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+        payload = fetch_json(url, timeout=self._timeout)
         raw: object = payload.get("entries") if isinstance(payload, dict) else payload
         if not isinstance(raw, list):
             return []
