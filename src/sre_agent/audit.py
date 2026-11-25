@@ -41,8 +41,11 @@ import json
 import threading
 from pathlib import Path
 
+from .logging_config import get_logger
 from .models import AuditRecord, Target
 from .policy import EnvironmentPolicy, PolicyResult, ProposedAction, evaluate
+
+log = get_logger(__name__)
 
 # The ``prev_hash`` of the first record in every log: 64 zero
 # characters, so a real record hash (also 64 hex characters) can
@@ -169,7 +172,15 @@ class AuditLog:
             if not lines:
                 return GENESIS_HASH
             last = AuditRecord.model_validate_json(lines[-1])
-        except (OSError, ValueError):
+        except (OSError, ValueError) as exc:
+            # New records will start a fresh chain; verification will
+            # flag the break, but say so now rather than silently.
+            log.warning(
+                "audit log %s: last record unreadable (%s); "
+                "new records start from the genesis hash",
+                path,
+                type(exc).__name__,
+            )
             return GENESIS_HASH
         return last.record_hash or GENESIS_HASH
 
@@ -213,12 +224,15 @@ class AuditLog:
             prev_hash=self._last_hash,
         )
         record.record_hash = record_hash(record)
-        self._last_hash = record.record_hash
-        self._records.append(record)
+        # File first: if the append fails, memory must not move ahead
+        # of the file, or the next record would chain to a hash the
+        # file never holds and verification would report tampering.
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             with self._path.open("a", encoding="utf-8") as handle:
                 handle.write(record.model_dump_json() + "\n")
+        self._last_hash = record.record_hash
+        self._records.append(record)
         return record.model_copy()
 
     def for_incident(self, incident_id: str) -> list[AuditRecord]:

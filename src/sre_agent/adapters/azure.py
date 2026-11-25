@@ -30,8 +30,14 @@ MAX_AZURE_ROWS = 50
 MAX_KQL_LENGTH = 1000
 
 # Azure management commands change a workspace; a read adapter
-# must never send one. They all start with a dot.
-_MANAGEMENT_RE = re.compile(r"(?i)(^|[;\s])\.(drop|delete|set|clear|ingest|create|alter)\b")
+# must never send one. They all start with a dot, so rather than
+# listing command names (.purge, .append, .rename ... slipped past a
+# name list) any statement or pipe stage that starts with a dot is
+# refused; the named commands are still refused anywhere.
+_MANAGEMENT_RE = re.compile(
+    r"(?im)(^|[;|])\s*\.[A-Za-z]"
+    r"|(^|[;\s])\.(drop|delete|set|clear|ingest|create|alter)\b"
+)
 
 
 class KqlQueryRequest(BaseModel):

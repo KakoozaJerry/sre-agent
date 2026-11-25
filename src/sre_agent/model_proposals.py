@@ -62,7 +62,7 @@ from .approvals import PendingAction, create_pending
 from .audit import AuditLog, evaluate_and_audit
 from .logging_config import get_logger
 from .model_backend import ModelClient
-from .models import Incident
+from .models import Incident, IncidentStatus
 from .policy import (
     RUNBOOK_CATALOG,
     ActionClass,
@@ -266,6 +266,16 @@ def submit_model_proposal(
     turning a pending action into a run is the approval flow's
     job, and it needs a named human.
     """
+    if incident.status is not IncidentStatus.DIAGNOSED:
+        # The server's proposal route refuses the same way: a fix is
+        # proposed only for a diagnosed incident, never one that is
+        # still triaging, already mitigating, or resolved.
+        log.info(
+            "model proposal skipped: incident %s is %s, not diagnosed",
+            incident.id,
+            incident.status.value,
+        )
+        return ModelProposalOutcome()
     action = proposer.propose(incident, runbook_backend)
     if action is None:
         return ModelProposalOutcome()
@@ -281,6 +291,11 @@ def submit_model_proposal(
         return ModelProposalOutcome(action=action, result=result, pending=pending)
     if result.decision is Decision.ALLOW:
         run_result = executor.execute(action, result)
+        # Record the run on the incident exactly as the server does,
+        # so it shows in the incident file and in "unsafe action"
+        # counts that read action evidence.
+        incident.add_evidence(run_result.to_evidence())
+        incident.transition(IncidentStatus.MITIGATING)
         return ModelProposalOutcome(
             action=action, result=result, run_result=run_result
         )

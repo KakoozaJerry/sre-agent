@@ -10,6 +10,7 @@ becomes evidence exactly like a Prometheus one.
 
 from __future__ import annotations
 
+import math
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
@@ -64,9 +65,14 @@ def parse_datadog_response(payload: dict[str, object]) -> list[MetricSeries]:
                 if not (isinstance(point, list) and len(point) == 2):
                     continue
                 try:
+                    point_value = float(point[1])
+                    if not math.isfinite(point_value):
+                        continue
                     ts = datetime.fromtimestamp(float(point[0]) / 1000.0, tz=UTC)
-                    samples.append(MetricSample(timestamp=ts, value=float(point[1])))
-                except (TypeError, ValueError):
+                    samples.append(MetricSample(timestamp=ts, value=point_value))
+                except (TypeError, ValueError, OverflowError, OSError):
+                    # One bad point is skipped; it must not discard
+                    # the rest of the series.
                     continue
         series.append(
             MetricSeries(

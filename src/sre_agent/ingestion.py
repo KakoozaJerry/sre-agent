@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -153,9 +154,9 @@ class GenericAlertPayload(BaseModel):
     """The simple webhook body: one alert, plain fields."""
 
     alert_name: str = Field(max_length=MAX_SHORT_TEXT_LENGTH)
-    service: str = Field(max_length=MAX_SHORT_TEXT_LENGTH)
-    namespace: str = Field(default="default", max_length=MAX_SHORT_TEXT_LENGTH)
-    environment: str = Field(default="demo", max_length=MAX_SHORT_TEXT_LENGTH)
+    service: str = Field(min_length=1, max_length=MAX_SHORT_TEXT_LENGTH)
+    namespace: str = Field(default="default", min_length=1, max_length=MAX_SHORT_TEXT_LENGTH)
+    environment: str = Field(default="demo", min_length=1, max_length=MAX_SHORT_TEXT_LENGTH)
     severity: str = Field(default="unknown", max_length=MAX_SHORT_TEXT_LENGTH)
     status: str = Field(default=FIRING, max_length=MAX_SHORT_TEXT_LENGTH)
     fingerprint: str = Field(default="", max_length=MAX_SHORT_TEXT_LENGTH)
@@ -199,8 +200,10 @@ def normalize_alertmanager(
         alert_name = labels.get("alertname", "unknown")
         service = labels.get("service") or labels.get("job") or "unknown"
         target = Target(
-            environment=labels.get("environment", default_environment),
-            namespace=labels.get("namespace", "default"),
+            # An empty label falls back like a missing one; an empty
+            # target field would fail Incident validation with a 500.
+            environment=labels.get("environment") or default_environment,
+            namespace=labels.get("namespace") or "default",
             service=service,
         )
         incoming.append(
@@ -296,6 +299,11 @@ class IncidentStore:
         self._active_by_group: dict[tuple[str, str, str, str], str] = {}
         self._incident_by_fingerprint: dict[str, str] = {}
         self._duplicate_counts: dict[str, int] = {}
+        # The server's sync endpoints run in a threadpool; ingest is a
+        # check-then-insert, so two alerts for one group racing through
+        # it would open two incidents. Re-entrant so a subclass can hold
+        # it around its own write-through.
+        self._lock = threading.RLock()
 
     def list_incidents(self) -> list[Incident]:
         return list(self._incidents.values())
@@ -338,15 +346,21 @@ class IncidentStore:
         """
 
     def ingest(self, alert: IncomingAlert) -> IngestResult:
-        if alert.status == RESOLVED:
-            return self._resolve(alert)
-        return self._fire(alert)
+        with self._lock:
+            if alert.status == RESOLVED:
+                return self._resolve(alert)
+            return self._fire(alert)
 
     def _fire(self, alert: IncomingAlert) -> IngestResult:
         known_id = self._incident_by_fingerprint.get(alert.fingerprint)
         if known_id is not None and known_id in self._incidents:
             incident = self._incidents[known_id]
-            if incident.status is not IncidentStatus.RESOLVED:
+            # The sender picks the fingerprint, so a reused one must
+            # not fold an alert for another target into this incident.
+            if (
+                incident.status is not IncidentStatus.RESOLVED
+                and incident.target == alert.target
+            ):
                 self._duplicate_counts[incident.id] = (
                     self._duplicate_counts.get(incident.id, 0) + 1
                 )
@@ -394,7 +408,13 @@ class IncidentStore:
             incident_id = self._incident_by_fingerprint.get(alert.fingerprint)
             if incident_id is not None:
                 candidate = self._incidents.get(incident_id)
-                if candidate is None or candidate.status is IncidentStatus.RESOLVED:
+                if (
+                    candidate is None
+                    or candidate.status is IncidentStatus.RESOLVED
+                    # A reused fingerprint must not close another
+                    # target's incident.
+                    or candidate.target != alert.target
+                ):
                     incident_id = None
         if incident_id is None:
             log.info("resolved alert with no open incident; nothing to close")

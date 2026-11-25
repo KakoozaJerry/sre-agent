@@ -605,6 +605,10 @@ def run_regression_check(
             baseline = record_new_baseline(report, baseline_path)
         except ValueError as exc:
             raise CliError(str(exc)) from exc
+        except OSError as exc:
+            raise CliError(
+                f"could not write the baseline to {baseline_path}: {exc.strerror or exc}"
+            ) from exc
         print(
             f"Baseline updated at {baseline_path}: version {baseline.version}, "
             f"recorded {baseline.recorded_on}, accuracy {baseline.accuracy:.0%}, "

@@ -41,7 +41,8 @@ re-recorded its own baseline would prove nothing.
 from __future__ import annotations
 
 import json
-from datetime import date
+import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -133,7 +134,7 @@ def baseline_from_report(
 ) -> Baseline:
     """Build a baseline record from one measured evaluation report."""
     ver = version if version is not None else __version__
-    day = recorded_on if recorded_on is not None else date.today().isoformat()
+    day = recorded_on if recorded_on is not None else datetime.now(UTC).date().isoformat()
     record = ReleaseRecord(
         version=ver,
         recorded_on=day,
@@ -172,9 +173,13 @@ def save_baseline(baseline: Baseline, path: str | Path) -> None:
     """Write a baseline file, creating its folder if needed."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
+    # Write beside it, then swap in: a crash mid-write must not leave
+    # a truncated baseline.json behind.
+    temporary = target.with_name(target.name + ".tmp")
+    temporary.write_text(
         json.dumps(baseline.model_dump(), indent=2) + "\n", encoding="utf-8"
     )
+    os.replace(temporary, target)
 
 
 def check_regression(

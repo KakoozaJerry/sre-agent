@@ -27,6 +27,11 @@ MAX_PODS = 50
 MAX_NAMESPACE_LENGTH = 63
 
 _NAMESPACE_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
+# A Kubernetes label value: at most 63 characters, alphanumerics with
+# '-', '_' or '.' inside. The service name is placed into a
+# labelSelector, so anything else (',', '!', '=', spaces) could change
+# which pods the selector matches.
+_LABEL_VALUE_RE = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]{0,61}[A-Za-z0-9])?")
 
 
 class PodStatus(BaseModel):
@@ -86,7 +91,9 @@ def parse_kubernetes_pods(payload: dict[str, object]) -> list[PodStatus]:
                     if entry.get("ready") is True:
                         ready += 1
                     try:
-                        restarts += int(entry.get("restartCount", 0))
+                        # A negative count would fail PodStatus and
+                        # lose the whole listing; clamp it.
+                        restarts += max(0, int(entry.get("restartCount", 0)))
                     except (TypeError, ValueError):
                         continue
         pods.append(
@@ -117,6 +124,15 @@ class ListPodsRequest(BaseModel):
         if not name or len(name) > MAX_NAMESPACE_LENGTH or not _NAMESPACE_RE.match(name):
             raise ValueError(f"not a valid Kubernetes namespace name: {v!r}")
         return name
+
+    @field_validator("service")
+    @classmethod
+    def _service_must_be_a_label_value(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        if not _LABEL_VALUE_RE.fullmatch(v):
+            raise ValueError(f"not a valid Kubernetes label value: {v!r}")
+        return v
 
 
 class KubernetesPodsResult(BaseModel):

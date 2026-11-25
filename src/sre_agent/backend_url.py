@@ -139,6 +139,19 @@ def validate_backend_url(
         raise ValueError(
             f"{what} must be an http:// or https:// address with a host: {url!r}"
         )
+    try:
+        port = parsed.port
+    except ValueError:
+        raise ValueError(f"{what} has an invalid port (host {host})") from None
+    if port == 0:
+        raise ValueError(f"{what} has an invalid port (host {host})")
+    if parsed.query or parsed.fragment or parsed.params:
+        # Backends append their own paths to this base address; a
+        # query string or fragment here would swallow those paths
+        # (and is where an api_key=... would otherwise end up in logs).
+        raise ValueError(
+            f"{what} must not carry a query string or fragment (host {host})"
+        )
     if parsed.username or parsed.password:
         raise ValueError(
             # The address itself is not echoed: it carries the very
@@ -152,12 +165,8 @@ def validate_backend_url(
         # control (see this module's docstring). Any other host
         # is refused, exactly as before.
         http_entries = list(allow_http_hosts) if allow_http_hosts else []
-        try:
-            http_port = parsed.port
-        except ValueError:
-            http_port = -1
         if not any(
-            _host_matches(host, http_port, entry) for entry in http_entries
+            _host_matches(host, port, entry) for entry in http_entries
         ):
             raise ValueError(
                 f"{what} uses plain http to a host that is not on this "
@@ -167,10 +176,6 @@ def validate_backend_url(
             )
     if allowed_hosts is not None:
         entries = list(allowed_hosts)
-        try:
-            port = parsed.port
-        except ValueError:
-            port = -1  # an unparseable port matches no entry
         if not any(_host_matches(host, port, entry) for entry in entries):
             raise ValueError(
                 f"{what} host {host} is not on the allow-list "
