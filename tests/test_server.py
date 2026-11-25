@@ -860,3 +860,69 @@ def test_the_shipped_app_carries_demo_memory_advice():
     found = shipped.get(f"/incidents/{body['incident_id']}").json()
     assert found["memory_report"] is not None
     assert found["memory_report"]["past_incidents_held"] == 4
+
+
+def test_concurrent_approves_run_the_action_once(
+    approvals_setup, monkeypatch: pytest.MonkeyPatch
+):
+    """A double click or client retry must not run the action twice."""
+    import threading
+    import time
+
+    import sre_agent.server as server_module
+    from sre_agent.models import Target
+
+    client, backend, _, audit = approvals_setup
+    incident_id = _diagnosed_incident(client)
+    pending = _propose(client, incident_id).json()["pending"]
+
+    real_approve = server_module.approve_pending
+
+    def slow_approve(*args, **kwargs):
+        # Widen the window between "not yet decided" and "decided".
+        time.sleep(0.05)
+        return real_approve(*args, **kwargs)
+
+    monkeypatch.setattr(server_module, "approve_pending", slow_approve)
+    url = f"/incidents/{incident_id}/approvals/{pending['id']}/approve"
+    barrier = threading.Barrier(4)
+    codes: list[int] = []
+
+    def approve() -> None:
+        barrier.wait()
+        codes.append(client.post(url, headers=APPROVER_HEADERS).status_code)
+
+    threads = [threading.Thread(target=approve) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(codes) == [200, 409, 409, 409]
+    state = backend.get(Target(environment="demo", namespace="shop", service="checkout"))
+    assert state is not None and state.restarts == 1
+    allows = [r for r in audit.for_incident(incident_id) if r.decision == "allow"]
+    assert len(allows) == 1
+
+
+@pytest.mark.parametrize("header", [TOKEN_HEADER, APPROVER_TOKEN_HEADER])
+def test_a_non_ascii_token_is_refused_not_a_server_error(approvals_setup, header):
+    client, _, _, _ = approvals_setup
+    incident_id = _diagnosed_incident(client)
+    pending = _propose(client, incident_id).json()["pending"]
+    guarded = TestClient(
+        create_app(
+            IncidentStore(),
+            auth_token="api-token",
+            approver_tokens={"approver-token": "Abraham"},
+        ),
+        raise_server_exceptions=False,
+    )
+    bad = "café".encode("latin-1")
+    if header == TOKEN_HEADER:
+        response = guarded.get("/incidents", headers={header: bad})
+    else:
+        response = client.post(
+            f"/incidents/{incident_id}/approvals/{pending['id']}/approve",
+            headers={header: bad},
+        )
+    assert response.status_code == 401

@@ -152,6 +152,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
@@ -294,11 +295,12 @@ def fetch_json(url: str) -> Any:
     A server that is not there, an answer that is not JSON, and an
     HTTP error are all turned into one plain sentence.
     """
-    headers = {"Accept": "application/json"}
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
     api_token = os.environ.get(ENV_API_TOKEN)
     if api_token:
-        headers[TOKEN_HEADER] = api_token
-    request = urllib.request.Request(url, headers=headers)
+        # Unredirected: if the server answers with a redirect, the
+        # token is not carried along to wherever it points.
+        request.add_unredirected_header(TOKEN_HEADER, api_token)
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             body = response.read().decode("utf-8")
@@ -306,6 +308,8 @@ def fetch_json(url: str) -> Any:
         if exc.code == 404:
             raise CliError("the server says that incident does not exist") from exc
         raise CliError(f"the server answered with an error (HTTP {exc.code})") from exc
+    except UnicodeDecodeError as exc:
+        raise CliError("the server answered, but its answer was not UTF-8 text") from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise CliError(
             f"could not reach the agent server at {url} — is it running? "
@@ -834,7 +838,8 @@ def main(
             positional, base_url = _split_base_url(rest)
             if len(positional) != 1:
                 raise CliError("show needs exactly one incident id")
-            incident = get_json(f"{base_url}/incidents/{positional[0]}")
+            incident_id = urllib.parse.quote(positional[0], safe="")
+            incident = get_json(f"{base_url}/incidents/{incident_id}")
             if not isinstance(incident, dict):
                 raise CliError("the server answered, but not with an incident")
             print(format_incident_detail(incident))

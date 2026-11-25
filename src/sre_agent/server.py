@@ -163,11 +163,13 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import threading
 from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from . import approvals as approvals_module
 from .adapters import AdapterSources, demo_adapter_sources
 from .approvals import (
     ApprovalError,
@@ -379,6 +381,10 @@ def create_app(
     # Restored approvals (a database store hands back what a
     # previous server left; the in-memory store hands back none).
     pendings, decisions = incident_store.load_approvals()
+    # Guards the check-then-decide step of approve and reject, so two
+    # concurrent requests (a double click, a client retry, an approve
+    # racing a reject) cannot both decide the same pending action.
+    decision_lock = threading.Lock()
 
     def diagnose_if_needed(result: IngestResult) -> None:
         """Run the reasoning loop for one ingested alert, if it fits.
@@ -449,7 +455,7 @@ def create_app(
         if token is None:
             return
         if x_sre_agent_token is None or not secrets.compare_digest(
-            x_sre_agent_token, token
+            x_sre_agent_token.encode("utf-8"), token.encode("utf-8")
         ):
             raise HTTPException(
                 status_code=401, detail="missing or wrong API token"
@@ -541,9 +547,18 @@ def create_app(
                 ),
             )
         if presented is not None:
+            # Compare as bytes (a str compare_digest raises TypeError on
+            # non-ASCII input, which would surface as a 500) and check
+            # every token, so timing does not reveal which one matched.
+            presented_bytes = presented.encode("utf-8")
+            matched: str | None = None
             for approver_token, approver_name in approvers.items():
-                if secrets.compare_digest(presented, approver_token):
-                    return approver_name
+                if secrets.compare_digest(
+                    presented_bytes, approver_token.encode("utf-8")
+                ):
+                    matched = approver_name
+            if matched is not None:
+                return matched
         raise HTTPException(
             status_code=401, detail="missing or wrong approver token"
         )
@@ -670,30 +685,42 @@ def create_app(
             )
         approver = _authenticated_approver(x_sre_agent_approver_token)
         pending = _pending_or_404(incident_id, pending_id)
-        if pending.id in decisions:
-            raise HTTPException(
-                status_code=409,
-                detail="this approval has already been decided; "
-                "propose the action again for a new approval",
-            )
+        # One clock reading for the approval and the run, so an
+        # approval granted just inside its window cannot expire
+        # between the two steps.
+        moment = approvals_module._utcnow()
+        with decision_lock:
+            if pending.id in decisions:
+                raise HTTPException(
+                    status_code=409,
+                    detail="this approval has already been decided; "
+                    "propose the action again for a new approval",
+                )
+            try:
+                grant, allowed = approve_pending(
+                    pending,
+                    approved_by=approver,
+                    policy=policy,
+                    audit_log=audit,
+                    incident_target=incident.target,
+                    now=moment,
+                )
+            except ApprovalError as exc:
+                status_code = 403 if "policy now denies" in str(exc) else 409
+                raise HTTPException(
+                    status_code=status_code, detail=str(exc)
+                ) from exc
+            # The grant is spent by the run attempt, success or failure
+            # (see approvals.execute_approved), so the pending action
+            # is decided from here on either way.
+            decisions[pending.id] = "approved"
+            incident_store.save_approval(pending, "approved")
         try:
-            grant, allowed = approve_pending(
-                pending,
-                approved_by=approver,
-                policy=policy,
-                audit_log=audit,
-                incident_target=incident.target,
+            run_result = execute_approved(
+                executor, pending, grant, allowed, now=moment
             )
         except ApprovalError as exc:
-            status_code = 403 if "policy now denies" in str(exc) else 409
-            raise HTTPException(status_code=status_code, detail=str(exc)) from exc
-        # The grant is spent by the run attempt, success or failure
-        # (see approvals.execute_approved), so the pending action
-        # is decided from here on either way.
-        decisions[pending.id] = "approved"
-        incident_store.save_approval(pending, "approved")
-        try:
-            run_result = execute_approved(executor, pending, grant, allowed)
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         except RunbookError as exc:
             raise HTTPException(
                 status_code=422,
@@ -736,13 +763,14 @@ def create_app(
             )
         approver = _authenticated_approver(x_sre_agent_approver_token)
         pending = _pending_or_404(incident_id, pending_id)
-        if pending.id in decisions:
-            raise HTTPException(
-                status_code=409,
-                detail="this approval has already been decided",
-            )
-        decisions[pending.id] = "rejected"
-        incident_store.save_approval(pending, "rejected")
+        with decision_lock:
+            if pending.id in decisions:
+                raise HTTPException(
+                    status_code=409,
+                    detail="this approval has already been decided",
+                )
+            decisions[pending.id] = "rejected"
+            incident_store.save_approval(pending, "rejected")
         return {
             "pending_id": pending.id,
             "decision": "rejected",

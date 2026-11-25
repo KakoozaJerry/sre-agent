@@ -10,12 +10,11 @@ becomes evidence exactly like a Prometheus one.
 
 from __future__ import annotations
 
-import json
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 
-from ..backend_url import validate_backend_url
+from ..backend_url import fetch_json, validate_backend_url
 from ..logging_config import get_logger
 from ..tools import (
     MetricSample,
@@ -141,8 +140,7 @@ class DatadogMetricsBackend:
                 "DD-APPLICATION-KEY": self._app_key,
             },
         )
-        with urllib.request.urlopen(request, timeout=self._timeout) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+        payload = fetch_json(request, timeout=self._timeout)
         if not isinstance(payload, dict):
             return []
         return parse_datadog_response(payload)

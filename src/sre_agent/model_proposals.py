@@ -196,7 +196,7 @@ def _checked_reply(
     """
     try:
         parsed = json.loads(reply)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, RecursionError):
         log.warning("model proposal reply was not JSON; it is refused whole")
         return None
     if not isinstance(parsed, dict):

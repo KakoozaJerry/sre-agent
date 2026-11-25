@@ -221,7 +221,9 @@ class MemoryReport(BaseModel):
 class Incident(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     title: str
-    target: Target
+    # Pinned at creation: proposals and policy checks rely on it, so
+    # reassigning it after the fact is refused.
+    target: Target = Field(frozen=True)
     status: IncidentStatus = IncidentStatus.OPEN
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)

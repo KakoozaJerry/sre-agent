@@ -517,7 +517,7 @@ def parse_model_reply(
     """
     try:
         parsed = json.loads(reply)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, RecursionError):
         log.warning("model reply was not JSON; it is refused whole")
         return [], []
     if not isinstance(parsed, dict):
