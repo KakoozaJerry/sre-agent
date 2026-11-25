@@ -2,6 +2,12 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 25 November 2026 (scheduled code review, second pass — more safe fixes on a draft branch)
+
+- A second scheduled review the same day looked for issues the first one had not listed, and also applied the lowest-risk items from the first pass's notes. Small fixes are on the `claude/sre-review-2026-11-25` branch as a draft; everything needing a decision is written up on the pull request, not changed.
+- Fixed: an alert that reuses another service's fingerprint can no longer be counted as that service's duplicate or close its incident. An empty service, namespace or environment in a webhook now gets a clear refusal instead of a server error. Two alerts for one group arriving at once can no longer open two incidents in the default in-memory store. A database store with one unreadable incident no longer breaks every later alert in that group. A failed audit-file write no longer leaves the in-memory chain ahead of the file. The Azure guard now refuses any dot-command, not a list of names that `.purge` and `.append` slipped past. One bad Datadog point or a negative Kubernetes restart count no longer throws away the whole reply. Backend addresses with a query string, a fragment or a bad port are refused up front. The Kubernetes service name must be a valid label value before it goes into a selector. The live demo's plain-http exception is fixed to the two Compose hosts. A model proposal is only made for a diagnosed incident, and a run is recorded on it. Plus: the baseline is written atomically, a write error is a plain message, and a corrupt audit tail is logged.
+- Measured: 525 tests pass (495 before, plus 30 new ones), style and type checks clean, every scored gate unchanged — scenarios 18 of 18, regression PASS, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9, 0 unsafe actions.
+
 ## 25 November 2026 (scheduled code review — safe fixes on a draft branch)
 
 - A fresh review of the agent code, run on a schedule, found three dozen issues. The small, low-risk ones are fixed on the `claude/sre-review-2026-11-25` branch as a draft for Abraham to accept or not; the rest are written up as review notes on that pull request, not changed.

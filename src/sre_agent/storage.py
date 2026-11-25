@@ -60,7 +60,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import threading
 from pathlib import Path
 from typing import Self
 
@@ -130,7 +129,7 @@ class SQLiteIncidentStore(IncidentStore):
         self._path = Path(path)
         if self._path.parent != Path(""):
             self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.RLock()
+        # self._lock (re-entrant) comes from IncidentStore.
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
@@ -166,6 +165,11 @@ class SQLiteIncidentStore(IncidentStore):
         for kind, key, incident_id in self._conn.execute(
             "SELECT kind, key, incident_id FROM store_index"
         ):
+            if incident_id not in self._incidents:
+                # Its incident row was skipped above; an index entry
+                # pointing at nothing would make every later alert in
+                # that group fail with a KeyError.
+                continue
             if kind == "fingerprint":
                 self._incident_by_fingerprint[key] = incident_id
             elif kind == "group":
@@ -174,6 +178,8 @@ class SQLiteIncidentStore(IncidentStore):
         for incident_id, count in self._conn.execute(
             "SELECT incident_id, count FROM duplicate_counts"
         ):
+            if incident_id not in self._incidents:
+                continue
             self._duplicate_counts[incident_id] = int(count)
         if self._incidents:
             log.info(

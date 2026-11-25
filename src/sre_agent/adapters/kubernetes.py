@@ -91,7 +91,9 @@ def parse_kubernetes_pods(payload: dict[str, object]) -> list[PodStatus]:
                     if entry.get("ready") is True:
                         ready += 1
                     try:
-                        restarts += int(entry.get("restartCount", 0))
+                        # A negative count would fail PodStatus and
+                        # lose the whole listing; clamp it.
+                        restarts += max(0, int(entry.get("restartCount", 0)))
                     except (TypeError, ValueError):
                         continue
         pods.append(

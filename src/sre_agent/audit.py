@@ -224,12 +224,15 @@ class AuditLog:
             prev_hash=self._last_hash,
         )
         record.record_hash = record_hash(record)
-        self._last_hash = record.record_hash
-        self._records.append(record)
+        # File first: if the append fails, memory must not move ahead
+        # of the file, or the next record would chain to a hash the
+        # file never holds and verification would report tampering.
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             with self._path.open("a", encoding="utf-8") as handle:
                 handle.write(record.model_dump_json() + "\n")
+        self._last_hash = record.record_hash
+        self._records.append(record)
         return record.model_copy()
 
     def for_incident(self, incident_id: str) -> list[AuditRecord]:
