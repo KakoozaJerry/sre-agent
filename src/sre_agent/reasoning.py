@@ -262,6 +262,11 @@ class ReasoningLoop:
         seen_queries: set[str] = set()
         steps = 0
         budget_exhausted = False
+        # A core source that raised (Prometheus down, a network
+        # error) ends the plan the same way an empty budget does:
+        # the incident is escalated to a human with no claims,
+        # never left stranded in triage.
+        core_failed = False
 
         def run_once(key: str) -> bool:
             """Count one step. False means: stop, budget is gone.
@@ -300,46 +305,99 @@ class ReasoningLoop:
         status_result = None
         status_ev: Evidence | None = None
         if run_once(f"service status: {target.service}"):
-            status_result = self._tools.get_service_status(target)
-            status_ev = status_result.to_evidence()
-            gathered.append(status_ev)
-            incident.add_evidence(status_ev)
+            try:
+                status_result = self._tools.get_service_status(target)
+                status_ev = status_result.to_evidence()
+            except Exception:
+                log.exception(
+                    "core step %r failed for incident %s; the plan stops "
+                    "and the incident is escalated",
+                    "service status",
+                    incident.id,
+                )
+                core_failed = True
+                status_result = None
+                status_ev = None
+            if status_ev is not None:
+                gathered.append(status_ev)
+                incident.add_evidence(status_ev)
 
         # Step 2: what do its error logs say (in counts, not words)?
         logs_result = None
         logs_ev: Evidence | None = None
-        if not budget_exhausted and run_once(f"error logs: {target.service}"):
-            logs_result = self._tools.search_logs(
-                SearchLogsRequest(
-                    service=target.service,
-                    namespace=target.namespace,
-                    level="ERROR",
+        if not (budget_exhausted or core_failed) and run_once(
+            f"error logs: {target.service}"
+        ):
+            try:
+                logs_result = self._tools.search_logs(
+                    SearchLogsRequest(
+                        service=target.service,
+                        namespace=target.namespace,
+                        level="ERROR",
+                    )
                 )
-            )
-            logs_ev = logs_result.to_evidence()
-            gathered.append(logs_ev)
-            incident.add_evidence(logs_ev)
+                logs_ev = logs_result.to_evidence()
+            except Exception:
+                log.exception(
+                    "core step %r failed for incident %s; the plan stops "
+                    "and the incident is escalated",
+                    "error logs",
+                    incident.id,
+                )
+                core_failed = True
+                logs_result = None
+                logs_ev = None
+            if logs_ev is not None:
+                gathered.append(logs_ev)
+                incident.add_evidence(logs_ev)
 
         # Step 3: are errors showing up in the metrics?
         errors_result = None
         errors_ev: Evidence | None = None
-        if not budget_exhausted and run_once(f"promql: {ERROR_METRIC}"):
-            errors_result = self._tools.query_metrics(
-                QueryMetricsRequest(query=ERROR_METRIC)
-            )
-            errors_ev = errors_result.to_evidence()
-            gathered.append(errors_ev)
-            incident.add_evidence(errors_ev)
+        if not (budget_exhausted or core_failed) and run_once(
+            f"promql: {ERROR_METRIC}"
+        ):
+            try:
+                errors_result = self._tools.query_metrics(
+                    QueryMetricsRequest(query=ERROR_METRIC)
+                )
+                errors_ev = errors_result.to_evidence()
+            except Exception:
+                log.exception(
+                    "core step %r failed for incident %s; the plan stops "
+                    "and the incident is escalated",
+                    "error metric",
+                    incident.id,
+                )
+                core_failed = True
+                errors_result = None
+                errors_ev = None
+            if errors_ev is not None:
+                gathered.append(errors_ev)
+                incident.add_evidence(errors_ev)
 
         # Step 4: how much traffic is there, for context? It is
         # gathered and stored, but it never creates a claim or a
         # hypothesis on its own: traffic alone diagnoses nothing.
-        if not budget_exhausted and run_once(f"promql: {REQUEST_METRIC}"):
-            requests_ev = self._tools.query_metrics(
-                QueryMetricsRequest(query=REQUEST_METRIC)
-            ).to_evidence()
-            gathered.append(requests_ev)
-            incident.add_evidence(requests_ev)
+        if not (budget_exhausted or core_failed) and run_once(
+            f"promql: {REQUEST_METRIC}"
+        ):
+            try:
+                requests_ev: Evidence | None = self._tools.query_metrics(
+                    QueryMetricsRequest(query=REQUEST_METRIC)
+                ).to_evidence()
+            except Exception:
+                log.exception(
+                    "core step %r failed for incident %s; the plan stops "
+                    "and the incident is escalated",
+                    "request metric",
+                    incident.id,
+                )
+                core_failed = True
+                requests_ev = None
+            if requests_ev is not None:
+                gathered.append(requests_ev)
+                incident.add_evidence(requests_ev)
 
         # Extra steps, only for adapters the operator selected.
         # Each is one fixed question. A source that fails, or a
@@ -353,7 +411,7 @@ class ReasoningLoop:
         datadog_ev: Evidence | None = None
         azure_result: AzureQueryResult | None = None
         azure_ev: Evidence | None = None
-        if adapters is not None and not budget_exhausted:
+        if adapters is not None and not (budget_exhausted or core_failed):
             if adapters.kubernetes is not None and run_adapter_once(
                 f"kubernetes pods: {target.namespace}/{target.service}"
             ):
@@ -470,10 +528,13 @@ class ReasoningLoop:
                     f"hypothesis cites evidence not on the incident: {missing}"
                 )
 
-        if budget_exhausted:
+        if budget_exhausted or core_failed:
             summary = (
                 "I don't know: the step budget ran out before the evidence "
                 "plan finished, so this needs a human."
+                if budget_exhausted
+                else "I don't know: a core evidence source failed before "
+                "the evidence plan finished, so this needs a human."
             )
             incident.transition(IncidentStatus.ESCALATED)
             outcome = DiagnosisOutcome.INSUFFICIENT_EVIDENCE

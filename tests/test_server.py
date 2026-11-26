@@ -767,7 +767,9 @@ def test_a_failing_tool_layer_never_loses_the_alert():
     assert response.status_code == 200
     body = response.json()
     assert body["created"] is True
-    assert body["status"] == "triaging"
+    # A failed core source escalates to a human rather than leaving
+    # the incident stranded in triage (2026-11-26 review, R1).
+    assert body["status"] == "escalated"
     assert body["diagnosis"] is None
     assert len(broken_client.get("/incidents").json()) == 1
 
