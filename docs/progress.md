@@ -2,6 +2,12 @@
 
 What has been built, what changed, and what is next. Newest first. Kept deliberately readable: if you only read one file to follow this project, read this one.
 
+## 26 November 2026 (scheduled code review — two carried-over fixes on a draft branch)
+
+- The scheduled review applied the two "high" notes from the 25 November second pass. The small fixes are on the `claude/sre-review-2026-11-26` branch as a draft; everything needing a decision is written up on the pull request, not changed.
+- Fixed: when a core evidence source fails (Prometheus down, a network error), the incident is now escalated to a human with no claims ("I don't know"), instead of being left in triage where nothing would ever look at it again. And two fix proposals for one incident arriving at once (a double click on the hosted demo) can no longer both run the action: one lock now covers the check and the run.
+- Measured: 528 tests pass (525 before, plus 3 new ones; one existing test updated from "stays in triage" to "escalated"), style and type checks clean, every scored gate unchanged — scenarios 18 of 18, regression PASS, hostile-text set 8 of 8, Tier 3 drills 7 of 7, security probes 10 of 10, proposal selection 9 of 9, 0 unsafe actions.
+
 ## 25 November 2026 (scheduled code review, second pass — more safe fixes on a draft branch)
 
 - A second scheduled review the same day looked for issues the first one had not listed, and also applied the lowest-risk items from the first pass's notes. Small fixes are on the `claude/sre-review-2026-11-25` branch as a draft; everything needing a decision is written up on the pull request, not changed.

@@ -385,6 +385,11 @@ def create_app(
     # concurrent requests (a double click, a client retry, an approve
     # racing a reject) cannot both decide the same pending action.
     decision_lock = threading.Lock()
+    # Guards a proposal from its DIAGNOSED check through the
+    # transition its run makes, so two concurrent proposals (a
+    # double click on the hosted demo) cannot both pass the check
+    # and both run an action against one incident.
+    propose_lock = threading.Lock()
 
     def diagnose_if_needed(result: IngestResult) -> None:
         """Run the reasoning loop for one ingested alert, if it fits.
@@ -580,76 +585,77 @@ def create_app(
         incident = _incident_or_404(incident_id)
         policy, _ = _approvals_or_409()
         assert runbook_backend is not None  # checked by _approvals_or_409
-        if incident.status is not IncidentStatus.DIAGNOSED:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"incident is '{incident.status.value}'; only a diagnosed "
-                    "incident can have a fix proposed for it"
-                ),
-            )
-        try:
-            action = build_action(
-                body.runbook_id,
-                incident.target,
-                body.parameters,
-                runbook_backend,
-                rationale=body.rationale,
-            )
-        except RunbookError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        result = evaluate_and_audit(
-            action,
-            policy,
-            audit,
-            incident_id=incident.id,
-            incident_target=incident.target,
-        )
-        if result.decision is Decision.DENY:
-            raise HTTPException(status_code=403, detail=result.reason)
-        if result.decision is Decision.ALLOW:
-            # A policy that allows outright (a Tier 3 grant) runs
-            # through the same executor; the decision is already
-            # in the audit log.
-            assert executor is not None
+        with propose_lock:
+            if incident.status is not IncidentStatus.DIAGNOSED:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"incident is '{incident.status.value}'; only a diagnosed "
+                        "incident can have a fix proposed for it"
+                    ),
+                )
             try:
-                run_result = executor.execute(action, result)
+                action = build_action(
+                    body.runbook_id,
+                    incident.target,
+                    body.parameters,
+                    runbook_backend,
+                    rationale=body.rationale,
+                )
             except RunbookError as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
-            incident.add_evidence(run_result.to_evidence())
-            incident.transition(IncidentStatus.MITIGATING)
-            incident_store.save(incident)
+            result = evaluate_and_audit(
+                action,
+                policy,
+                audit,
+                incident_id=incident.id,
+                incident_target=incident.target,
+            )
+            if result.decision is Decision.DENY:
+                raise HTTPException(status_code=403, detail=result.reason)
+            if result.decision is Decision.ALLOW:
+                # A policy that allows outright (a Tier 3 grant) runs
+                # through the same executor; the decision is already
+                # in the audit log.
+                assert executor is not None
+                try:
+                    run_result = executor.execute(action, result)
+                except RunbookError as exc:
+                    raise HTTPException(status_code=422, detail=str(exc)) from exc
+                incident.add_evidence(run_result.to_evidence())
+                incident.transition(IncidentStatus.MITIGATING)
+                incident_store.save(incident)
+                return {
+                    "decision": result.decision.value,
+                    "reason": result.reason,
+                    "summary": run_result.summary,
+                    "incident_status": incident.status.value,
+                    "pending": None,
+                }
+            if tier3_only:
+                # Hosted demo mode: there is no approval path, so a
+                # proposal that is not allowed outright cannot run.
+                # The decision is already in the audit log; nothing
+                # becomes pending and nothing runs.
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "this server runs only actions its policy allows "
+                        "outright (the Tier 3 demo grant); "
+                        f"{body.runbook_id} needs a human approval, and "
+                        "approvals are disabled in hosted demo mode"
+                    ),
+                )
+            pending = create_pending(action, result, incident_id=incident.id)
+            pendings[pending.id] = pending
+            incident_store.save_approval(pending, None)
             return {
                 "decision": result.decision.value,
                 "reason": result.reason,
-                "summary": run_result.summary,
+                "summary": None,
                 "incident_status": incident.status.value,
-                "pending": None,
+                "pending": _pending_view(pending, decisions),
             }
-        if tier3_only:
-            # Hosted demo mode: there is no approval path, so a
-            # proposal that is not allowed outright cannot run.
-            # The decision is already in the audit log; nothing
-            # becomes pending and nothing runs.
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "this server runs only actions its policy allows "
-                    "outright (the Tier 3 demo grant); "
-                    f"{body.runbook_id} needs a human approval, and "
-                    "approvals are disabled in hosted demo mode"
-                ),
-            )
-        pending = create_pending(action, result, incident_id=incident.id)
-        pendings[pending.id] = pending
-        incident_store.save_approval(pending, None)
-        return {
-            "decision": result.decision.value,
-            "reason": result.reason,
-            "summary": None,
-            "incident_status": incident.status.value,
-            "pending": _pending_view(pending, decisions),
-        }
 
     @app.get("/incidents/{incident_id}/approvals", dependencies=guarded)
     def list_approvals(incident_id: str) -> list[dict[str, object]]:
